@@ -9,7 +9,7 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      test: ["CMD-SHELL", "pg_isready -U odoo -d postgres"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -34,7 +34,8 @@ services:
       - odoo-data:/var/lib/odoo
       # Modul Nusara dipasang dari folder lokal agar perubahan langsung terlihat.
       - ./addons:/mnt/extra-addons
-    command: odoo --admin-passwd=${ADMIN_PASSWD:?Isi ADMIN_PASSWD di file .env}
+    # Database manager dimatikan (list_db = False); database dibuat lewat perintah, lihat README.
+    command: odoo --admin-passwd=${ADMIN_PASSWD:?Isi ADMIN_PASSWD di file .env} --database=${ODOO_DB:-nusara}
 
 volumes:
   db-data:

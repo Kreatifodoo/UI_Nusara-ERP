@@ -46,14 +46,29 @@ docs/                         # peta modul, keputusan, dan CI/CD
 
 ## Menjalankan Odoo secara lokal
 
-Butuh Docker Desktop.
+Butuh Docker Desktop (di Settings → Resources, alokasikan minimal 4 GB RAM).
+
+1. Siapkan konfigurasi, lalu isi `DB_PASSWORD` dan `ADMIN_PASSWD` di `.env`:
 
 ```bash
-cp .env.example .env   # lalu isi DB_PASSWORD dan ADMIN_PASSWD
-docker compose up --build
+cp .env.example .env
 ```
 
-Buka http://localhost:8069, buat database (tanpa data demo), lalu pasang modul **Nusara Base**. Detail CI/CD dan penyiapan server ada di [docs/CICD.md](docs/CICD.md).
+2. Inisialisasi pertama: membuat database dan memasang modul Nusara Base (beberapa menit, sekali saja). Database manager di browser sengaja dimatikan, jadi database dibuat lewat perintah ini:
+
+```bash
+docker compose run --rm odoo odoo -d nusara -i nusara_base --without-demo=all --stop-after-init
+```
+
+3. Jalankan aplikasinya:
+
+```bash
+docker compose up
+```
+
+4. Buka http://localhost:8069 dan login dengan `admin` / `admin`, lalu **segera ganti password** di menu profil. Nama database di langkah 2 harus sama dengan `ODOO_DB` di `.env` (default `nusara`).
+
+Detail CI/CD dan penyiapan server ada di [docs/CICD.md](docs/CICD.md).
 
 Untuk mengubah form: edit data di `generate_forms.py`, lalu jalankan `python3 generate_forms.py`. Jangan edit file di `forms/` langsung, karena akan tertimpa.
 
