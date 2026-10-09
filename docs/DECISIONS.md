@@ -29,9 +29,10 @@ Format: satu entri per keputusan. Status: **Diputuskan**, **Terbuka**, atau **Pe
 - **B (selektif)**: frontend headless via JSON-2, hanya untuk portal atau layar kasir.
 
 ## D6. Kebutuhan Indonesia
-- **Status**: Perlu verifikasi
+- **Status**: Sebagian terverifikasi (2026-10-09)
 - **Daftar**: PPN, e-Faktur/Coretax, COA mengikuti PSAK, multi-currency, bahasa id_ID, format NPWP/NIK.
-- **Fakta**: dokumentasi Odoo mencantumkan `l10n_id`, `l10n_id_efaktur`, dan `l10n_id_efaktur_coretax`. Belum terkonfirmasi apakah e-Faktur/Coretax tersedia di Community.
+- **Terverifikasi** pada image `odoo:19.0` (Community): modul `l10n_id` (LGPL-3), `l10n_id_efaktur_coretax` (LGPL-3, ekspor XML untuk Coretax, bergantung pada `l10n_id`), dan `l10n_id_pos` tersedia. Modul `l10n_id_efaktur` (e-Faktur lama) **tidak ada** di Community. `l10n_id` sudah terpasang di database lokal.
+- **Belum**: data awal Indonesia belum diterapkan (perusahaan bawaan masih USD/US). Kesesuaian ekspor Coretax dengan ketentuan DJP terbaru perlu diuji dengan data nyata sebelum produksi.
 
 ## D7. Model hosting dan tenant
 - **Status**: Terbuka

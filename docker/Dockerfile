@@ -22,5 +22,10 @@ RUN set -eu; \
     fi
 COPY config/odoo.conf /etc/odoo/odoo.conf
 COPY addons /mnt/extra-addons
-RUN chown -R odoo:odoo /etc/odoo /mnt/extra-addons
+COPY docker/entrypoint.sh /usr/local/bin/nusara-entrypoint.sh
+RUN chmod 755 /usr/local/bin/nusara-entrypoint.sh \
+    && chown -R odoo:odoo /etc/odoo /mnt/extra-addons
 USER odoo
+# Menyuntikkan admin_passwd dari ADMIN_PASSWD, lalu meneruskan ke entrypoint bawaan image.
+ENTRYPOINT ["/usr/local/bin/nusara-entrypoint.sh"]
+CMD ["odoo"]
