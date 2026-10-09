@@ -1,0 +1,77 @@
+name: CD
+
+# Berjalan setelah CI hijau di main: build image, push ke GHCR, lalu (opsional) deploy ke staging.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/kreatifodoo/nusara-erp
+  ODOO_VERSION: "19.0"
+
+jobs:
+  image:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.vars.outputs.sha }}
+    steps:
+      - id: vars
+        run: echo "sha=${{ github.event.workflow_run.head_sha || github.sha }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.vars.outputs.sha }}
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          build-args: ODOO_VERSION=${{ env.ODOO_VERSION }}
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.vars.outputs.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    # Aktif hanya bila variabel repo DEPLOY_STAGING bernilai 'true' (lihat docs/CICD.md).
+    if: vars.DEPLOY_STAGING == 'true'
+    needs: image
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.image.outputs.sha }}
+      - name: Deploy ke server staging
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          IMAGE_TAG: ${{ needs.image.outputs.sha }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          scp -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
+            deploy/docker-compose.prod.yml deploy/update.sh \
+            "$DEPLOY_USER@$DEPLOY_HOST:/opt/nusara/"
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cd /opt/nusara && chmod +x update.sh && IMAGE_TAG=$IMAGE_TAG ./update.sh"

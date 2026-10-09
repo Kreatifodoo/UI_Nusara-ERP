@@ -1,0 +1,41 @@
+# Dipakai di server (staging/produksi) lewat deploy/update.sh. Butuh file .env di folder yang sama.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Isi DB_PASSWORD di .env}
+      POSTGRES_DB: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  odoo:
+    image: ghcr.io/kreatifodoo/nusara-erp:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HOST: db
+      USER: odoo
+      PASSWORD: ${DB_PASSWORD}
+    # Hanya dibuka ke localhost; akses publik lewat nginx (HTTPS).
+    ports:
+      - "127.0.0.1:8069:8069"
+      - "127.0.0.1:8072:8072"
+    volumes:
+      - odoo-data:/var/lib/odoo
+    command: >-
+      odoo --admin-passwd=${ADMIN_PASSWD:?Isi ADMIN_PASSWD di .env}
+      --workers=${ODOO_WORKERS:-2}
+      --db-filter=^${ODOO_DB:?Isi ODOO_DB di .env}$$
+
+volumes:
+  db-data:
+  odoo-data:

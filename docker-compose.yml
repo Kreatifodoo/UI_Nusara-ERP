@@ -1,0 +1,41 @@
+# Lingkungan pengembangan lokal. Butuh file .env (salin dari .env.example).
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Isi DB_PASSWORD di file .env}
+      POSTGRES_DB: postgres
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  odoo:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        ODOO_VERSION: ${ODOO_VERSION:-19.0}
+    image: nusara-erp:dev
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HOST: db
+      USER: odoo
+      PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "8069:8069"
+    volumes:
+      - odoo-data:/var/lib/odoo
+      # Modul Nusara dipasang dari folder lokal agar perubahan langsung terlihat.
+      - ./addons:/mnt/extra-addons
+    command: odoo --admin-passwd=${ADMIN_PASSWD:?Isi ADMIN_PASSWD di file .env}
+
+volumes:
+  db-data:
+  odoo-data:
