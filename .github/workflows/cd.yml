@@ -21,7 +21,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.vars.outputs.sha }}
     steps:
@@ -52,7 +52,7 @@ jobs:
     # Aktif hanya bila variabel repo DEPLOY_STAGING bernilai 'true' (lihat docs/CICD.md).
     if: vars.DEPLOY_STAGING == 'true'
     needs: image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: staging
     steps:
       - uses: actions/checkout@v5
