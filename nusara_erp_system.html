@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nusara ERP - Enterprise System</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* Custom scrollbar for sidebar */
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 4px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const menuData = [
+            {
+                title: "Purchase Request", icon: "fas fa-file-signature",
+                items: [
+                    { title: "Dashboard" },
+                    {
+                        title: "Master",
+                        items: [{ title: "Product Master" }]
+                    },
+                    { title: "Purchase Request" },
+                    {
+                        title: "Report",
+                        items: [{ title: "Purchase Request Line" }, { title: "Purchase Request Analisis" }]
+                    },
+                    { title: "Setting" }
+                ]
+            },
+            {
+                title: "Purchase", icon: "fas fa-shopping-cart",
+                items: [
+                    { title: "Dashboard" },
+                    {
+                        title: "Master",
+                        items: [{ title: "Vendor Master" }, { title: "Vendor Price list" }, { title: "Product Master" }]
+                    },
+                    { title: "Request for Quotation" },
+                    { title: "Purchase Order" },
+                    { title: "Create Vendor Bill" },
+                    {
+                        title: "Report",
+                        items: [{ title: "Purchase Order line" }, { title: "Purchase Order Analisis" }]
+                    },
+                    { title: "Setting" }
+                ]
+            },
+            {
+                title: "Inventory", icon: "fas fa-boxes",
+                items: [
+                    { title: "Dashboard" },
+                    {
+                        title: "Master",
+                        items: [
+                            { title: "Product Master" }, { title: "Product Category" }, { title: "Reorder Level" },
+                            { title: "Put away Rules" }, { title: "Unit of Measurement Master" }, 
+                            { title: "Lot & Serial Number Master" }, { title: "Warehouse & Location Master" }
+                        ]
+                    },
+                    {
+                        title: "Operation",
+                        items: [
+                            { title: "Material Request" }, { title: "Good Receive" }, { title: "Return GR" }, 
+                            { title: "Delivery Order" }, { title: "Return DO" }, { title: "Internal Transfer" }, 
+                            { title: "Physical Inventory" }, { title: "Replenishment" }, { title: "Scrap" }, { title: "Inventory Loss" }
+                        ]
+                    },
+                    {
+                        title: "Report",
+                        items: [
+                            { title: "Stock" }, { title: "Location" }, { title: "Move History" }, { title: "Move Analisis" }
+                        ]
+                    },
+                    { title: "Setting" }
+                ]
+            },
+            {
+                title: "Manufacture", icon: "fas fa-industry",
+                items: [
+                    { title: "Dashboard" },
+                    {
+                        title: "Master",
+                        items: [{ title: "Bill of Material" }, { title: "WorkCenter/workStation" }]
+                    },
+                    { title: "Schedule Production" },
+                    { title: "Manufacturing Order" },
+                    {
+                        title: "Reporting",
+                        items: [{ title: "Production Analisis" }]
+                    },
+                    { title: "Setting" }
+                ]
+            },
+            {
+                title: "CRM", icon: "fas fa-handshake",
+                items: [
+                    { title: "Dashboard" },
+                    {
+                        title: "Master",
+                        items: [{ title: "Master Customer" }, { title: "Master Product/Service" }]
+                    },
+                    { title: "Leads" },
+                    { title: "Opportunity" },
+                    {
+                        title: "Reporting",
+                        items: [{ title: "Forecast" }, { title: "Pipeline" }, { title: "Leads" }, { title: "Activities" }]
+                    },
+                    { title: "Setting" }
+                ]
+            },
+            {
+                title: "POS", icon: "fas fa-cash-register",
+                items: [
+                    { title: "Dashboard" },
+                    {
+                        title: "Master",
+                        items: [{ title: "Product Master" }, { title: "Customers Master" }]
+                    },
+                    { title: "POS Station" },
+                    { title: "POS Order" },
+                    { title: "POS Session" },
+                    { title: "Promotion & Loyalty" },
+                    {
+                        title: "Report",
+                        items: [{ title: "POS Order Report" }, { title: "Session Details" }, { title: "Sales Details" }]
+                    },
+                    { title: "Setting" }
+                ]
+            },
+            {
+                title: "Sales", icon: "fas fa-chart-line",
+                items: [
+                    { title: "Dashboard" },
+                    {
+                        title: "Master",
+                        items: [{ title: "Product Master" }, { title: "Customers Master" }, { title: "Promotion & Loyalty" }, { title: "Pricelis Master" }]
+                    },
+                    { title: "Quotations" },
+                    { title: "Sales Orders" },
+                    { title: "Create Customer Invoice" },
+                    {
+                        title: "Report",
+                        items: [{ title: "Sales Order line" }, { title: "Sales Order Analisis" }, { title: "Sales Person" }, { title: "Product" }, { title: "Commissions" }]
+                    },
+                    { title: "Setting" }
+                ]
+            },
+            {
+                title: "Accounting", icon: "fas fa-calculator",
+                items: [
+                    { title: "Dashboard" },
+                    {
+                        title: "Master",
+                        items: [
+                            { title: "Chart of Account" }, { title: "Customer Master" }, { title: "Vendor Master" },
+                            { title: "Product Master" }, { title: "Product Category" }, { title: "Tax Master" },
+                            { title: "Currencies" }, { title: "Jurnal" }, { title: "Asset Model" },
+                            { title: "Budget Plan Master" }, { title: "Analitic Account" }
+                        ]
+                    },
+                    {
+                        title: "Customers",
+                        items: [{ title: "Customer Invoice" }, { title: "Credit Note" }, { title: "Customer Payment" }]
+                    },
+                    {
+                        title: "Vendors",
+                        items: [{ title: "Vendor Bills" }, { title: "Debit Note" }, { title: "Vendor Payment" }]
+                    },
+                    { title: "Jurnal Entry" },
+                    { title: "Asset" },
+                    { title: "Budget" },
+                    { title: "Bank Transaction" },
+                    {
+                        title: "Reporting",
+                        items: [
+                            { title: "Balance Sheet" }, { title: "Profit and Loss" }, { title: "Cash Flow Statement" },
+                            { title: "General Ledger" }, { title: "Trial Balance" }, { title: "Partner Ledger" },
+                            { title: "Aged Receivable" }, { title: "Aged Payable" }, { title: "Tax Report" },
+                            { title: "Invoice Analysis" }, { title: "Executive Summary" }, { title: "Analytic Report" },
+                            { title: "Budget Report" }
+                        ]
+                    },
+                    { title: "Setting" }
+                ]
+            },
+            {
+                title: "General Setting", icon: "fas fa-cog",
+                items: [{ title: "Company Setting" }, { title: "Users & Access" }]
+            }
+        ];
+
+        const MenuItem = ({ item, level = 0, activePath, setActivePath }) => {
+            const hasChildren = item.items && item.items.length > 0;
+            const isActive = activePath[level] === item.title;
+            const isFullyActive = activePath.length - 1 === level && isActive;
+            
+            // To handle accordion state
+            const [isOpen, setIsOpen] = useState(isActive);
+
+            useEffect(() => {
+                if (isActive) setIsOpen(true);
+            }, [activePath, isActive]);
+
+            const handleClick = () => {
+                if (hasChildren) {
+                    setIsOpen(!isOpen);
+                } else {
+                    // Update active path array up to this level
+                    const newPath = [...activePath.slice(0, level), item.title];
+                    setActivePath(newPath);
+                }
+            };
+
+            const paddingLeft = level === 0 ? 'px-4' : level === 1 ? 'pl-10 pr-4' : 'pl-14 pr-4';
+            
+            return (
+                <div className="flex flex-col">
+                    <button 
+                        onClick={handleClick}
+                        className={`flex items-center justify-between py-3 ${paddingLeft} transition-colors duration-200 w-full text-left
+                            ${isFullyActive && !hasChildren ? 'bg-indigo-600 text-white' : 
+                              isActive && hasChildren ? 'bg-slate-800 text-indigo-400' : 
+                              'text-slate-300 hover:bg-slate-800 hover:text-white'}
+                        `}
+                    >
+                        <div className="flex items-center">
+                            {item.icon && <i className={`${item.icon} w-6 text-center mr-2 text-sm`}></i>}
+                            {level > 0 && !item.icon && <div className="w-1.5 h-1.5 rounded-full bg-current mr-3 opacity-50"></div>}
+                            <span className={`${level === 0 ? 'font-medium' : 'font-normal'} text-sm`}>{item.title}</span>
+                        </div>
+                        {hasChildren && (
+                            <i className={`fas fa-chevron-down text-xs transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}></i>
+                        )}
+                    </button>
+                    
+                    {/* Render Children */}
+                    {hasChildren && (
+                        <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                            <div className="bg-slate-900 border-l border-slate-700 ml-5 my-1">
+                                {item.items.map((child, idx) => (
+                                    <MenuItem 
+                                        key={idx} 
+                                        item={child} 
+                                        level={level + 1} 
+                                        activePath={activePath} 
+                                        setActivePath={setActivePath} 
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const Header = ({ toggleSidebar }) => (
+            <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 lg:px-8 sticky top-0 z-20">
+                <div className="flex items-center">
+                    <button onClick={toggleSidebar} className="lg:hidden text-gray-500 hover:text-indigo-600 focus:outline-none mr-4">
+                        <i className="fas fa-bars text-xl"></i>
+                    </button>
+                    <div className="relative hidden md:block">
+                        <i className="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" placeholder="Search menu, records, etc..." 
+                            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-64 lg:w-96 transition-all" />
+                    </div>
+                </div>
+                
+                <div className="flex items-center space-x-4">
+                    <button className="relative text-gray-500 hover:text-indigo-600 transition-colors">
+                        <i className="far fa-bell text-xl"></i>
+                        <span className="absolute top-0 right-0 -mt-1 -mr-1 bg-red-500 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center">3</span>
+                    </button>
+                    <div className="h-8 w-px bg-gray-200"></div>
+                    <div className="flex items-center cursor-pointer">
+                        <img src="https://ui-avatars.com/api/?name=Admin+Nusara&background=4f46e5&color=fff" alt="User" className="h-8 w-8 rounded-full border border-gray-200" />
+                        <div className="ml-3 hidden md:block">
+                            <p className="text-sm font-medium text-gray-700">Admin Nusara</p>
+                            <p className="text-xs text-gray-500">Super Administrator</p>
+                        </div>
+                        <i className="fas fa-chevron-down ml-2 text-xs text-gray-400 hidden md:block"></i>
+                    </div>
+                </div>
+            </header>
+        );
+
+        const DashboardContent = ({ activePath }) => {
+            const currentTitle = activePath[activePath.length - 1];
+            const moduleName = activePath[0];
+            
+            // Dummy Data for Dashboard view
+            const isDashboard = currentTitle === "Dashboard" || !currentTitle;
+
+            return (
+                <div className="p-6 lg:p-8 fade-in h-full">
+                    <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">{currentTitle || "Dashboard"}</h1>
+                            <div className="flex items-center mt-1 text-sm text-gray-500">
+                                <i className="fas fa-home mr-2"></i>
+                                {activePath.map((path, idx) => (
+                                    <React.Fragment key={idx}>
+                                        <span className={idx === activePath.length - 1 ? 'text-indigo-600 font-medium' : ''}>
+                                            {path}
+                                        </span>
+                                        {idx < activePath.length - 1 && <i className="fas fa-chevron-right text-[10px] mx-2"></i>}
+                                    </React.Fragment>
+                                ))}
+                            </div>
+                        </div>
+                        
+                        {!isDashboard && (
+                            <div className="mt-4 md:mt-0 space-x-2">
+                                <button className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition-all">
+                                    <i className="fas fa-filter mr-2"></i> Filter
+                                </button>
+                                <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm shadow-indigo-200 transition-all">
+                                    <i className="fas fa-plus mr-2"></i> Create New
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Standard Content View */}
+                    {isDashboard ? (
+                        <div className="space-y-6">
+                            {/* Stats Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 border-l-4 border-l-blue-500">
+                                    <p className="text-sm font-medium text-gray-500">Total Revenue ({moduleName})</p>
+                                    <h3 className="text-2xl font-bold text-gray-900 mt-1">Rp 124.5M</h3>
+                                    <p className="text-xs text-green-500 mt-2 flex items-center"><i className="fas fa-arrow-up mr-1"></i> +14.5% from last month</p>
+                                </div>
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 border-l-4 border-l-indigo-500">
+                                    <p className="text-sm font-medium text-gray-500">Active Transactions</p>
+                                    <h3 className="text-2xl font-bold text-gray-900 mt-1">1,248</h3>
+                                    <p className="text-xs text-green-500 mt-2 flex items-center"><i className="fas fa-arrow-up mr-1"></i> +2.4% from last month</p>
+                                </div>
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 border-l-4 border-l-yellow-500">
+                                    <p className="text-sm font-medium text-gray-500">Pending Approvals</p>
+                                    <h3 className="text-2xl font-bold text-gray-900 mt-1">36</h3>
+                                    <p className="text-xs text-yellow-600 mt-2 flex items-center"><i className="fas fa-exclamation-circle mr-1"></i> Needs attention</p>
+                                </div>
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 border-l-4 border-l-red-500">
+                                    <p className="text-sm font-medium text-gray-500">Critical Alerts</p>
+                                    <h3 className="text-2xl font-bold text-gray-900 mt-1">4</h3>
+                                    <p className="text-xs text-red-500 mt-2 flex items-center"><i className="fas fa-exclamation-triangle mr-1"></i> System warnings</p>
+                                </div>
+                            </div>
+
+                            {/* Charts/Tables Area */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 lg:col-span-2">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h4 className="text-base font-semibold text-gray-900">Performance Analytics</h4>
+                                        <button className="text-gray-400 hover:text-gray-600"><i className="fas fa-ellipsis-v"></i></button>
+                                    </div>
+                                    <div className="h-64 w-full bg-slate-50 rounded-lg flex items-end justify-between px-6 pt-10 pb-4 border border-dashed border-gray-200">
+                                        {/* Fake Chart Bars */}
+                                        {[40, 70, 45, 90, 65, 85, 120].map((h, i) => (
+                                            <div key={i} className="w-12 bg-indigo-500 rounded-t-sm opacity-80 hover:opacity-100 transition-opacity" style={{height: `${h}%`}}></div>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-between mt-2 px-6 text-xs text-gray-500 font-medium">
+                                        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+                                    </div>
+                                </div>
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h4 className="text-base font-semibold text-gray-900">Recent Activities</h4>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {[
+                                            { t: "Purchase Order #PO-992 Created", d: "2 mins ago", c: "bg-blue-100 text-blue-600", i: "fa-shopping-cart" },
+                                            { t: "Inventory Level Critical: Item A", d: "1 hour ago", c: "bg-red-100 text-red-600", i: "fa-exclamation" },
+                                            { t: "Customer Invoice #INV-102 Paid", d: "3 hours ago", c: "bg-green-100 text-green-600", i: "fa-check" },
+                                            { t: "New Lead Registered via POS", d: "5 hours ago", c: "bg-purple-100 text-purple-600", i: "fa-user" }
+                                        ].map((act, i) => (
+                                            <div key={i} className="flex items-start">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${act.c}`}>
+                                                    <i className={`fas ${act.i} text-xs`}></i>
+                                                </div>
+                                                <div className="ml-3">
+                                                    <p className="text-sm font-medium text-gray-800">{act.t}</p>
+                                                    <p className="text-xs text-gray-500 mt-0.5">{act.d}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button className="w-full mt-6 py-2 text-sm text-indigo-600 font-medium bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                                        View All Activities
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        /* Module Data Table Placeholder */
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50 border-b border-gray-200">
+                                            <th className="py-3 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">ID</th>
+                                            <th className="py-3 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</th>
+                                            <th className="py-3 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                                            <th className="py-3 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                                            <th className="py-3 px-6 text-xs font-semibold text-gray-600 uppercase tracking-wider text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                        {[1, 2, 3, 4, 5].map((row) => (
+                                            <tr key={row} className="hover:bg-gray-50 transition-colors">
+                                                <td className="py-4 px-6 text-sm font-medium text-gray-900">#{currentTitle.substring(0,3).toUpperCase()}-{1000 + row}</td>
+                                                <td className="py-4 px-6 text-sm text-gray-600">Sample data record for {currentTitle}</td>
+                                                <td className="py-4 px-6 text-sm">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${row % 3 === 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
+                                                        {row % 3 === 0 ? 'Pending' : 'Active'}
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 px-6 text-sm text-gray-600">Oct {10 + row}, 2026</td>
+                                                <td className="py-4 px-6 text-sm text-right">
+                                                    <button className="text-gray-400 hover:text-indigo-600 mx-1"><i className="fas fa-edit"></i></button>
+                                                    <button className="text-gray-400 hover:text-red-600 mx-1"><i className="fas fa-trash-alt"></i></button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                                <span className="text-sm text-gray-500">Showing 1 to 5 of 24 entries</span>
+                                <div className="flex space-x-1">
+                                    <button className="px-3 py-1 border border-gray-300 rounded bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50" disabled>Prev</button>
+                                    <button className="px-3 py-1 border border-indigo-500 rounded bg-indigo-50 text-indigo-600 font-medium">1</button>
+                                    <button className="px-3 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-50">2</button>
+                                    <button className="px-3 py-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-50">Next</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const App = () => {
+            // Default active path
+            const [activePath, setActivePath] = useState(["Inventory", "Dashboard"]);
+            const [sidebarOpen, setSidebarOpen] = useState(true);
+
+            // Close sidebar on mobile initially or when resizing
+            useEffect(() => {
+                const handleResize = () => {
+                    if (window.innerWidth < 1024) {
+                        setSidebarOpen(false);
+                    } else {
+                        setSidebarOpen(true);
+                    }
+                };
+                window.addEventListener('resize', handleResize);
+                handleResize(); // Init
+                return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
+            return (
+                <div className="flex h-screen bg-gray-50 overflow-hidden">
+                    {/* Mobile Sidebar Overlay */}
+                    {!sidebarOpen && window.innerWidth < 1024 && (
+                        <div 
+                            className="fixed inset-0 bg-gray-900 bg-opacity-50 z-20 lg:hidden"
+                            onClick={() => setSidebarOpen(false)}
+                        ></div>
+                    )}
+
+                    {/* Sidebar */}
+                    <aside 
+                        className={`fixed lg:static inset-y-0 left-0 z-30 w-72 bg-slate-900 text-white flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                    >
+                        {/* Logo Area */}
+                        <div className="h-16 flex items-center justify-between px-6 bg-slate-950 border-b border-slate-800 shrink-0">
+                            <div className="flex items-center text-xl font-bold tracking-wide">
+                                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center mr-3 shadow-lg shadow-indigo-500/30">
+                                    <i className="fas fa-layer-group text-white text-sm"></i>
+                                </div>
+                                Nusara <span className="text-indigo-400 ml-1">ERP</span>
+                            </div>
+                            <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-white">
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+
+                        {/* Navigation Menu */}
+                        <nav className="flex-1 overflow-y-auto sidebar-scroll py-4">
+                            <div className="px-4 pb-2 mb-2">
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Main Modules</p>
+                            </div>
+                            {menuData.map((item, idx) => (
+                                <MenuItem 
+                                    key={idx} 
+                                    item={item} 
+                                    activePath={activePath} 
+                                    setActivePath={setActivePath} 
+                                />
+                            ))}
+                        </nav>
+                        
+                        {/* Sidebar Footer */}
+                        <div className="p-4 bg-slate-950 border-t border-slate-800 shrink-0">
+                            <div className="flex items-center text-sm text-slate-400">
+                                <i className="fas fa-server mr-2"></i> v2.0.4 - Enterprise
+                            </div>
+                        </div>
+                    </aside>
+
+                    {/* Main Content */}
+                    <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                        <Header toggleSidebar={() => setSidebarOpen(true)} />
+                        
+                        <div className="flex-1 overflow-y-auto">
+                            <DashboardContent activePath={activePath} />
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

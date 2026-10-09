@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Journal Entry - Nusara ERP</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            kompak: {
+              primary: '#1E40AF',       /* Kompak Deep Blue */
+              primaryHover: '#1D4ED8',  /* Blue Hover */
+              accent: '#0284C7',        /* Kompak Cyan / Sky */
+              accentHover: '#0369A1',
+              navy: '#0F172A',          /* Dark Slate */
+              canvas: '#F8FAFC',        /* Light Grayish Blue Canvas */
+              sheetBg: '#FFFFFF',
+              border: '#E2E8F0',
+              borderLight: '#F1F5F9',
+              muted: '#64748B',
+              surface: '#F8FAFC'
+            }
+          },
+          maxWidth: {
+            'form-sheet': '1140px',     /* Standar Form Sheet Enterprise */
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #F8FAFC;
+      color: #0F172A;
+      font-size: 13px;
+    }
+
+    /* Chevron Status Stage Pipeline Kompak */
+    .kompak-stage {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 16px 0 20px;
+      height: 34px;
+      font-size: 12px;
+      font-weight: 500;
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+      transition: all 0.15s ease-in-out;
+      margin-left: -7px;
+    }
+    .kompak-stage:first-child {
+      clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+      margin-left: 0;
+      padding-left: 14px;
+    }
+    .kompak-stage:last-child {
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 10px 50%);
+    }
+
+    /* Form Input Fields Kompak */
+    .kompak-input {
+      border: 1px solid #CBD5E1;
+      background-color: transparent;
+      padding: 5px 9px;
+      font-size: 13px;
+      border-radius: 6px;
+      color: #0F172A;
+      transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+    .kompak-input:focus {
+      outline: none;
+      border-color: #1E40AF;
+      box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.15);
+      background-color: #FFFFFF;
+    }
+    .kompak-input:hover:not(:focus) {
+      border-color: #94A3B8;
+    }
+
+    /* Custom subtle scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col pb-16">
+
+  <!-- ========================================================
+       TOP CONTROL PANEL & NAVBAR (Breadcrumb + Model Switcher)
+       ======================================================== -->
+  <header class="bg-white border-b border-kompak-border sticky top-0 z-30 shadow-xs">
+    <div class="max-w-[1240px] mx-auto px-4 sm:px-6 h-12 flex items-center justify-between">
+      <!-- Brand & Breadcrumbs -->
+      <div class="flex items-center space-x-2 text-xs sm:text-sm">
+        <div class="w-6 h-6 bg-kompak-primary rounded-md flex items-center justify-center text-white text-xs font-bold mr-1 shadow-xs">
+          <i class="fa-solid fa-shapes text-2xs"></i>
+        </div>
+        <span class="font-bold text-kompak-primary tracking-wide mr-1">KOMPAK</span>
+        <span class="text-slate-300">|</span>
+        <span class="text-kompak-muted hover:text-kompak-primary cursor-pointer font-medium" id="breadcrumbParent">Penjualan</span>
+        <span class="text-slate-300">/</span>
+        <span class="font-bold text-kompak-navy" id="breadcrumbCurrentDoc">SO-2026-0891</span>
+        
+        <!-- Save indicator -->
+        <span class="ml-2 text-2xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+          <i class="fa-solid fa-circle-check text-3xs"></i> Tersimpan
+        </span>
+      </div>
+
+      <!-- Action Pager & Model Switcher -->
+      <div class="flex items-center gap-2">
+        <!-- Switch Form Category (Transaksi vs Master Data) -->
+        <div class="bg-slate-100 p-0.5 rounded-lg border border-kompak-border flex items-center text-xs">
+          <button id="btnModeTx" style="display:none;" onclick="switchFormMode('transaction')" class="px-3 py-1 rounded-md bg-white shadow-xs font-semibold text-kompak-primary flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-file-invoice text-xs"></i> Transaksi Data
+          </button>
+          <button id="btnModeMaster" style="display:none;" onclick="switchFormMode('master')" class="px-3 py-1 rounded-md text-kompak-muted hover:text-kompak-navy flex items-center gap-1.5 transition font-medium">
+            <i class="fa-solid fa-address-book text-xs"></i> Master Data
+          </button>
+        </div>
+
+        <!-- Pager Navigation -->
+        <div class="hidden sm:flex items-center text-xs text-kompak-muted border-l border-kompak-border pl-3 ml-1">
+          <span class="mr-2 font-mono">1 / 48</span>
+          <button class="p-1 hover:text-kompak-navy hover:bg-slate-100 rounded text-xs transition" title="Sebelumnya"><i class="fa-solid fa-chevron-left"></i></button>
+          <button class="p-1 hover:text-kompak-navy hover:bg-slate-100 rounded text-xs transition" title="Berikutnya"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================================
+       KOMPAK FORM SHEET CONTAINER (Max-Width 1140px Sheet)
+       ======================================================== -->
+  <main class="w-full max-w-form-sheet mx-auto px-2 sm:px-4 mt-4 flex-1">
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2 px-4 py-2.5 rounded-lg shadow-lg border text-xs font-medium"></div>
+
+    <!-- Outer Form Box -->
+    <div class="bg-white border border-kompak-border rounded-xl shadow-xs overflow-hidden">
+
+      <!-- ========================================================
+           SECTION 1: STATUS BAR
+           Kiri: Action Buttons (Primary / Secondary)
+           Kanan: Status Stage Pipeline
+           ======================================================== -->
+      <section id="section-status-bar" class="bg-slate-50/80 border-b border-kompak-border px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-h-[46px]">
+        <!-- 1.A: Action Buttons (Kiri) -->
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="btnPrimaryAction" onclick="handlePrimaryAction()" class="bg-kompak-primary hover:bg-kompak-primaryHover text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition flex items-center gap-1.5 active:scale-98">
+            <i class="fa-solid fa-check text-xs"></i>
+            <span id="primaryActionText">KONFIRMASI</span>
+          </button>
+
+          <button onclick="handleSecondaryAction()" class="bg-white hover:bg-slate-100 text-kompak-navy border border-kompak-border px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+            <i class="fa-regular fa-paper-plane text-kompak-muted"></i>
+            <span>Kirim Notifikasi</span>
+          </button>
+
+          <button onclick="window.print()" class="bg-white hover:bg-slate-100 text-kompak-navy border border-kompak-border px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+            <i class="fa-solid fa-print text-kompak-muted"></i>
+            <span>Cetak PDF</span>
+          </button>
+
+          <button id="btnCancelAction" onclick="handleCancel()" class="bg-white hover:bg-rose-50 text-rose-600 border border-slate-300 hover:border-rose-300 px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1">
+            <span>Batal</span>
+          </button>
+        </div>
+
+        <!-- 1.B: Status Stage Pipeline (Kanan) -->
+        <div class="flex items-center overflow-x-auto scrollbar-none self-end sm:self-center">
+          <div id="statusPipeline" class="flex items-center select-none border border-kompak-border rounded-lg overflow-hidden bg-slate-200">
+            <!-- Injected via JavaScript -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================
+           KOMPAK FORM SHEET CONTENT
+           ======================================================== -->
+      <div class="p-6 sm:p-8 bg-white relative">
+
+        <!-- ========================================================
+             SECTION 2: LINK DOCUMENTS (Multi-Document Linked Hub)
+             Terletak di pojok kanan atas lembar formulir
+             ======================================================== -->
+        <section id="section-link-documents" class="flex justify-end mb-5 border-b border-kompak-borderLight pb-4">
+          <div id="linkedDocsContainer" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <!-- Smart Button Cards rendered dynamically via JS -->
+          </div>
+        </section>
+
+        <!-- ========================================================
+             SECTION 3: HEADER FIELDS (Title & 2-Column Responsive Grid)
+             ======================================================== -->
+        <section id="section-header-fields" class="mb-6">
+          <!-- Document Title & Badge -->
+          <div class="mb-5">
+            <span id="headerPrefixBadge" class="text-3xs uppercase tracking-wider font-bold text-kompak-muted block mb-1">
+              Sales Order
+            </span>
+            <div class="flex items-center gap-3">
+              <h1 id="headerDocumentTitle" class="text-2xl sm:text-3xl font-extrabold text-kompak-navy tracking-tight">SO-2026-0891</h1>
+              <span id="headerDocStatusTag" class="px-2.5 py-0.5 rounded-full text-2xs font-semibold bg-sky-100 text-sky-800 border border-sky-200">Aktif</span>
+            </div>
+          </div>
+
+          <!-- Two-Column Responsive Grid Form -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-2.5 border-t border-slate-100 pt-4" id="headerFormGrid">
+            <!-- Injected dynamically via JavaScript -->
+          </div>
+        </section>
+
+        <!-- ========================================================
+             SECTION 4: ORDER LINE FIELDS (Tab View & Dynamic Table)
+             Optional Subtotal & Tax Toggle Included
+             ======================================================== -->
+        <section id="section-order-lines" class="mb-6">
+          <!-- Notebook Tab Bar -->
+          <div class="flex items-center justify-between border-b border-kompak-border mb-3">
+            <div class="flex items-center space-x-6 text-xs font-semibold">
+              <button class="pb-2.5 border-b-2 border-kompak-primary text-kompak-primary flex items-center gap-1.5" id="tabLineItems">
+                <i class="fa-solid fa-list-check text-xs"></i>
+                <span id="orderLineSectionTitle">Rincian Baris Data</span>
+                <span id="lineItemCountBadge" class="bg-blue-50 text-kompak-primary border border-blue-200 px-2 py-0.2 rounded-full text-2xs font-bold ml-1">3</span>
+              </button>
+              <button class="pb-2.5 text-kompak-muted hover:text-kompak-navy transition" onclick="showToast('Tab Informasi Ekstra (Catatan Pengiriman, Akun Finansial)', 'info')">
+                Informasi Tambahan
+              </button>
+              <button class="pb-2.5 text-kompak-muted hover:text-kompak-navy transition" onclick="showToast('Tab Dokumen Pendukung & Lampiran Kontrak', 'info')">
+                Berkas Pendukung
+              </button>
+            </div>
+
+            <!-- Tax & Subtotal Toggle Switch (Optional Subtotal & Tax) -->
+            <div id="taxToggleWrapper" class="flex items-center gap-2 mb-2 bg-slate-50 border border-kompak-border px-3 py-1 rounded-lg text-2xs">
+              <span class="text-kompak-muted font-medium">Pajak & Subtotal:</span>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="toggleTaxSubtotal" class="sr-only peer" checked onchange="toggleTaxCalculation(this.checked)">
+                <div class="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-kompak-primary"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- List Table Container -->
+          <div class="overflow-x-auto border border-kompak-border rounded-lg shadow-2xs">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-100/70 text-kompak-navy font-semibold border-b border-kompak-border select-none">
+                  <th class="p-2.5 w-8 text-center text-kompak-muted font-mono">#</th>
+                  <th class="p-2.5">Item Deskripsi</th>
+                  <th class="p-2.5 w-24 text-center" id="colQty">Kuantitas</th>
+                  <th class="p-2.5 w-24 text-center" id="colUnit">Satuan</th>
+                  <th class="p-2.5 w-32 text-right" id="colPrice">Harga Satuan</th>
+                  <th class="p-2.5 w-24 text-right col-tax-cell">Pajak</th>
+                  <th class="p-2.5 w-36 text-right col-subtotal-cell">Subtotal</th>
+                  <th class="p-2.5 w-10 text-center"></th>
+                </tr>
+              </thead>
+              <tbody id="lineItemsBody" class="divide-y divide-slate-100">
+                <!-- Dynamically generated rows -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Add Line Action -->
+          <div class="mt-3 flex items-center justify-between">
+            <button onclick="addNewLineItem()" class="text-kompak-primary hover:text-kompak-primaryHover font-semibold text-xs flex items-center gap-1.5 py-1.5 px-3 bg-blue-50/60 hover:bg-blue-100/70 rounded-lg transition border border-blue-200/60">
+              <i class="fa-solid fa-plus text-2xs"></i>
+              <span id="btnAddLineText">Tambahkan Baris Baru</span>
+            </button>
+            <span class="text-3xs text-kompak-muted italic">* Nilai angka pada tabel dapat diubah langsung</span>
+          </div>
+        </section>
+
+        <!-- ========================================================
+             SECTION 5: FOOTER FIELDS (Terms & Grand Totals)
+             ======================================================== -->
+        <section id="section-footer-fields" class="pt-5 border-t border-kompak-border">
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <!-- Left Side: Terms & Notes -->
+            <div class="md:col-span-7 space-y-3">
+              <div>
+                <label class="block text-2xs font-bold uppercase tracking-wider text-kompak-muted mb-1">Syarat & Ketentuan / Catatan Rekanan</label>
+                <textarea id="fieldTerms" rows="2" class="w-full kompak-input text-xs" placeholder="Syarat pembayaran, penyerahan barang, atau ketentuan khusus..."></textarea>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label class="block text-2xs font-semibold text-kompak-muted mb-1">Catatan Internal Perusahaan</label>
+                  <input type="text" id="fieldInternalNote" class="w-full kompak-input" placeholder="Hanya terlihat oleh tim internal">
+                </div>
+                <div>
+                  <label class="block text-2xs font-semibold text-kompak-muted mb-1">Penanggung Jawab (PIC Staff)</label>
+                  <input type="text" id="fieldApprover" class="w-full kompak-input" value="Budi Setiawan (Kompak Operations)">
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Side: Calculation Totals Box -->
+            <div id="footerSummaryBox" class="md:col-span-5 flex flex-col justify-start">
+              <div class="bg-slate-50 border border-kompak-border rounded-xl p-3.5 text-xs space-y-2.5">
+                <div class="flex justify-between items-center text-kompak-muted">
+                  <span>Jumlah Bersih (Untaxed)</span>
+                  <span id="summaryUntaxed" class="font-mono font-medium text-kompak-navy">Rp 0</span>
+                </div>
+                <div id="summaryTaxRow" class="flex justify-between items-center text-kompak-muted">
+                  <span>Pajak Pertambahan Nilai (11%)</span>
+                  <span id="summaryTax" class="font-mono font-medium text-kompak-navy">Rp 0</span>
+                </div>
+                <div class="border-t border-kompak-border pt-2 flex justify-between items-baseline">
+                  <span class="font-bold text-sm text-kompak-navy">Total Akhir</span>
+                  <span id="summaryTotal" class="font-mono text-base font-extrabold text-kompak-primary">Rp 0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div> <!-- End Form Sheet -->
+
+      <!-- ========================================================
+           SECTION 6: ACTIVITIES TRACKING (Chatter & Audit Trail)
+           ======================================================== -->
+      <section id="section-activities-tracking" class="bg-slate-50 border-t border-kompak-border p-6 sm:p-8">
+        <div class="max-w-[850px] mx-auto">
+          <!-- Tracking Action Bar -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-kompak-border">
+            <div class="flex items-center gap-2">
+              <button onclick="openChatterInput('comment')" class="px-3.5 py-1.5 bg-kompak-primary hover:bg-kompak-primaryHover text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition">
+                <i class="fa-solid fa-message text-2xs"></i>
+                <span>Kirim Pesan</span>
+              </button>
+              <button onclick="openChatterInput('log')" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-kompak-navy border border-kompak-border rounded-lg text-xs font-medium flex items-center gap-1.5 transition">
+                <i class="fa-regular fa-clipboard text-2xs text-kompak-muted"></i>
+                <span>Catat Log</span>
+              </button>
+              <button onclick="openChatterInput('activity')" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-kompak-navy border border-kompak-border rounded-lg text-xs font-medium flex items-center gap-1.5 transition">
+                <i class="fa-regular fa-calendar-check text-2xs text-sky-600"></i>
+                <span>Jadwalkan Aktivitas</span>
+              </button>
+            </div>
+
+            <!-- Followers Tag -->
+            <div class="flex items-center text-xs text-kompak-muted gap-2">
+              <span class="flex items-center gap-1 bg-white border border-kompak-border px-2.5 py-1 rounded-full">
+                <i class="fa-regular fa-bell text-kompak-primary"></i>
+                <span>Pengikut: <strong class="text-kompak-navy">3</strong></span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Chatter Compose Box -->
+          <div id="chatterInputBox" class="hidden mt-4 bg-white p-3.5 rounded-xl border border-kompak-border shadow-xs">
+            <div class="flex items-center justify-between mb-2">
+              <span id="chatterInputLabel" class="text-xs font-bold text-kompak-navy">Kirim Pesan ke Pengikut</span>
+              <button onclick="closeChatterInput()" class="text-kompak-muted hover:text-kompak-navy text-xs p-1">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <textarea id="txtChatterInput" rows="2" class="w-full kompak-input text-xs" placeholder="Tuliskan catatan atau instruksi aktivitas..."></textarea>
+            <div class="mt-2.5 flex justify-end gap-2">
+              <button onclick="closeChatterInput()" class="px-3 py-1.5 text-xs text-kompak-muted hover:text-kompak-navy">Batal</button>
+              <button onclick="submitChatterEntry()" class="px-3.5 py-1.5 bg-kompak-primary hover:bg-kompak-primaryHover text-white rounded-lg text-xs font-semibold transition">Posting</button>
+            </div>
+          </div>
+
+          <!-- Timeline Stream -->
+          <div id="timelineList" class="mt-5 space-y-3">
+            <!-- Timeline elements dynamically injected -->
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ========================================================
+       APPLICATION LOGIC & DATA DEFINITION
+       ======================================================== -->
+  <script>
+    let currentMode = 'transaction';
+    let isTaxEnabled = true;
+
+    // DATA FOR TRANSACTION MODE (Kompak Sales Order)
+    const transactionData = {
+    "code": "BNK/2026/10/001",
+    "badge": "Journal Entry",
+    "breadcrumbCategory": "Accounting",
+    "currentStageIndex": 0,
+    "stages": [
+        "Draft",
+        "Posted"
+    ],
+    "linkedDocs": [],
+    "headerLeft": [
+        {
+            "id": "ref",
+            "label": "Reference",
+            "type": "text",
+            "value": "Bank Fees"
+        },
+        {
+            "id": "journal",
+            "label": "Journal",
+            "type": "text",
+            "value": "Bank"
+        }
+    ],
+    "headerRight": [
+        {
+            "id": "date",
+            "label": "Date",
+            "type": "date",
+            "value": "2026-10-09"
+        }
+    ],
+    "linesTitle": "Journal Items",
+    "lines": [
+        {
+            "id": 1,
+            "name": "Bank Fees Expense (Debit)",
+            "qty": 1,
+            "unit": "-",
+            "price": 25000
+        },
+        {
+            "id": 2,
+            "name": "Bank Account (Credit)",
+            "qty": 1,
+            "unit": "-",
+            "price": -25000
+        }
+    ],
+    "terms": "",
+    "activities": []
+};
+
+    // DATA FOR MASTER DATA MODE (Kompak Partner / Contact Master)
+    const masterData = {
+      code: "PT SAMUDERA BAHARI SENTOSA",
+      badge: "Master Kontak & Rekanan",
+      breadcrumbCategory: "Kontak / Rekanan",
+      currentStageIndex: 2, // 0: Calon Mitra, 1: Verifikasi, 2: Mitra Aktif, 3: Arsip
+      stages: ["Calon Mitra", "Verifikasi Legal", "Mitra Aktif", "Arsip"],
+      linkedDocs: [
+        { label: "Transaksi Jual", count: "14", subtext: "Total Pesanan", icon: "fa-cart-shopping", bg: "hover:bg-blue-50/50", badgeColor: "text-blue-700 bg-blue-100" },
+        { label: "Faktur Selesai", count: "Rp 84 jt", subtext: "Total Nilai", icon: "fa-money-bill-wave", bg: "hover:bg-emerald-50/50", badgeColor: "text-emerald-700 bg-emerald-100" },
+        { label: "Piutang Berjalan", count: "Rp 12.5 jt", subtext: "Menunggu Bayar", icon: "fa-triangle-exclamation", bg: "hover:bg-amber-50/50", badgeColor: "text-amber-700 bg-amber-100" },
+        { label: "Agenda Kunjungan", count: "3", subtext: "Jadwal Temu", icon: "fa-calendar-days", bg: "hover:bg-sky-50/50", badgeColor: "text-sky-700 bg-sky-100" }
+      ],
+      headerLeft: [
+        { id: "custType", label: "Kategori Entitas", type: "select", options: ["Badan Usaha (PT/CV)", "Individu / Perorangan"], value: "Badan Usaha (PT/CV)" },
+        { id: "address", label: "Alamat Domisili", type: "text", value: "Jl. Boulevard Barat Raya Blok LC-7, Kelapa Gading" },
+        { id: "city", label: "Kota & Wilayah", type: "text", value: "Jakarta Utara, DKI Jakarta 14240" },
+        { id: "npwp", label: "Nomor Pokok Wajib Pajak", type: "text", value: "01.234.567.8-012.000" }
+      ],
+      headerRight: [
+        { id: "phone", label: "Nomor Hotline", type: "tel", value: "+62 21 4587 9000" },
+        { id: "email", label: "Email Korespondensi", type: "email", value: "purchasing@samuderabahari.co.id" },
+        { id: "website", label: "Portal Web", type: "text", value: "www.samuderabahari.co.id" },
+        { id: "creditLimit", label: "Plafon Kredit (Limit)", type: "text", value: "Rp 200.000.000" }
+      ],
+      linesTitle: "Daftar Personel Penghubung & Cabang",
+      lines: [
+        { id: 1, name: "Ir. Hendra Wijaya (Direktur Operasional)", qty: 1, unit: "Orang", price: 0, customSub: "Kontak Utama" },
+        { id: 2, name: "Dewi Lestari (Finance Lead)", qty: 1, unit: "Orang", price: 0, customSub: "Faktur & Pajak" },
+        { id: 3, name: "Rian Pratama (Kepala Gudang Tanjung Priok)", qty: 1, unit: "Orang", price: 0, customSub: "Penerimaan Barang" }
+      ],
+      linesCustomPlaceholder: "Kontak Person Baru...",
+      terms: "Perjanjian Kerjasama: Fasilitas pembayaran tempo 14 hari kerja dengan diskon kontrak khusus 5%.",
+      activities: [
+        { user: "Ahmad Zaki", role: "Legal Specialist", time: "3 hari lalu", type: "stage_change", text: "Verifikasi legalitas dan NPWP disetujui. Status diperbarui ke <b>Mitra Aktif</b>." },
+        { user: "Kompak System", role: "Sistem Otomatis", time: "1 minggu lalu", type: "system", text: "Entitas rekanan berhasil didaftarkan ke basis data Kompak." }
+      ]
+    };
+
+    function initForm() {
+      renderStatusPipeline();
+      renderLinkedDocs();
+      renderHeaderFields();
+      renderOrderLines();
+      renderFooter();
+      renderActivities();
+    }
+
+    // Switch between Transaction Data and Master Data modes
+    function switchFormMode(mode) {
+      currentMode = mode;
+      const btnTx = document.getElementById('btnModeTx');
+      const btnMaster = document.getElementById('btnModeMaster');
+
+      if (mode === 'transaction') {
+        btnTx.className = "px-3 py-1 rounded-md bg-white shadow-xs font-semibold text-kompak-primary flex items-center gap-1.5 transition";
+        btnMaster.className = "px-3 py-1 rounded-md text-kompak-muted hover:text-kompak-navy flex items-center gap-1.5 transition font-medium";
+        document.getElementById('taxToggleWrapper').classList.remove('hidden');
+        document.getElementById('footerSummaryBox').classList.remove('hidden');
+      } else {
+        btnMaster.className = "px-3 py-1 rounded-md bg-white shadow-xs font-semibold text-kompak-primary flex items-center gap-1.5 transition";
+        btnTx.className = "px-3 py-1 rounded-md text-kompak-muted hover:text-kompak-navy flex items-center gap-1.5 transition font-medium";
+        document.getElementById('taxToggleWrapper').classList.add('hidden');
+        document.getElementById('footerSummaryBox').classList.add('hidden');
+      }
+
+      initForm();
+      showToast(`Beralih ke format formulir: ${mode === 'transaction' ? 'Transaksi Data (Sales Order)' : 'Master Data (Kontak)'}`, 'info');
+    }
+
+    function getCurrentDataset() {
+      return currentMode === 'transaction' ? transactionData : masterData;
+    }
+
+    /* SECTION 1: Status Bar Pipeline */
+    function renderStatusPipeline() {
+      const data = getCurrentDataset();
+      const container = document.getElementById('statusPipeline');
+      container.innerHTML = '';
+
+      data.stages.forEach((stageName, index) => {
+        const isActive = index === data.currentStageIndex;
+        const isPassed = index < data.currentStageIndex;
+
+        const stageBtn = document.createElement('button');
+        stageBtn.type = "button";
+        stageBtn.onclick = () => updateStage(index);
+        stageBtn.className = `kompak-stage ${
+          isActive 
+            ? 'bg-kompak-primary text-white font-semibold shadow-xs z-10' 
+            : isPassed 
+              ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' 
+              : 'bg-white text-kompak-muted hover:bg-slate-100'
+        }`;
+
+        stageBtn.innerHTML = `
+          <span class="flex items-center gap-1.5">
+            ${isPassed ? '<i class="fa-solid fa-check text-3xs text-emerald-600"></i>' : ''}
+            <span>${stageName}</span>
+          </span>
+        `;
+        container.appendChild(stageBtn);
+      });
+
+      // Update primary button label
+      const primaryBtnText = document.getElementById('primaryActionText');
+      if (currentMode === 'transaction') {
+        primaryBtnText.textContent = data.currentStageIndex === 0 ? "KIRIM PENAWARAN" : (data.currentStageIndex === 1 ? "KONFIRMASI" : "SELESAIKAN");
+      } else {
+        primaryBtnText.textContent = "SIMPAN PERUBAHAN";
+      }
+
+      // Update Breadcrumbs
+      document.getElementById('breadcrumbParent').textContent = data.breadcrumbCategory;
+      document.getElementById('breadcrumbCurrentDoc').textContent = data.code;
+    }
+
+    function updateStage(newIndex) {
+      const data = getCurrentDataset();
+      const oldStage = data.stages[data.currentStageIndex];
+      data.currentStageIndex = newIndex;
+      const newStage = data.stages[newIndex];
+
+      data.activities.unshift({
+        user: "Pengguna (Anda)",
+        role: "Operator",
+        time: "Baru saja",
+        type: "stage_change",
+        text: `Status tahapan formulir diperbarui dari <b>${oldStage}</b> menjadi <b>${newStage}</b>.`
+      });
+
+      renderStatusPipeline();
+      renderActivities();
+      showToast(`Tahapan status berhasil diperbarui ke '${newStage}'`, 'success');
+    }
+
+    /* SECTION 2: Link Documents */
+    function renderLinkedDocs() {
+      const data = getCurrentDataset();
+      const container = document.getElementById('linkedDocsContainer');
+      container.innerHTML = '';
+
+      data.linkedDocs.forEach(doc => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.onclick = () => showToast(`Membuka dokumen referensi: ${doc.label}`, 'info');
+        btn.className = `flex items-center gap-2.5 p-2.5 border border-kompak-border rounded-xl text-left transition ${doc.bg} bg-white group hover:border-blue-300`;
+        btn.innerHTML = `
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center ${doc.badgeColor} font-bold text-xs">
+            <i class="fa-solid ${doc.icon}"></i>
+          </div>
+          <div class="leading-tight">
+            <div class="font-extrabold text-xs text-kompak-navy group-hover:text-kompak-primary">${doc.count}</div>
+            <div class="text-3xs text-kompak-muted font-medium">${doc.subtext}</div>
+          </div>
+        `;
+        container.appendChild(btn);
+      });
+    }
+
+    /* SECTION 3: Header Fields */
+    function renderHeaderFields() {
+      const data = getCurrentDataset();
+      document.getElementById('headerPrefixBadge').textContent = data.badge;
+      document.getElementById('headerDocumentTitle').textContent = data.code;
+
+      const container = document.getElementById('headerFormGrid');
+      container.innerHTML = '';
+
+      // Left Column Group
+      const leftCol = document.createElement('div');
+      leftCol.className = "space-y-2.5";
+      data.headerLeft.forEach(f => leftCol.appendChild(createKompakFieldRow(f)));
+
+      // Right Column Group
+      const rightCol = document.createElement('div');
+      rightCol.className = "space-y-2.5";
+      data.headerRight.forEach(f => rightCol.appendChild(createKompakFieldRow(f)));
+
+      container.appendChild(leftCol);
+      container.appendChild(rightCol);
+    }
+
+    function createKompakFieldRow(field) {
+      const row = document.createElement('div');
+      row.className = "flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-1";
+
+      const label = document.createElement('label');
+      label.className = "w-full sm:w-2/5 font-semibold text-kompak-navy";
+      label.textContent = field.label;
+
+      const inputContainer = document.createElement('div');
+      inputContainer.className = "w-full sm:w-3/5";
+
+      if (field.type === 'select') {
+        const sel = document.createElement('select');
+        sel.className = "w-full kompak-input";
+        field.options.forEach(opt => {
+          const optEl = document.createElement('option');
+          optEl.value = opt;
+          optEl.textContent = opt;
+          if (opt === field.value) optEl.selected = true;
+          sel.appendChild(optEl);
+        });
+        inputContainer.appendChild(sel);
+      } else {
+        const inp = document.createElement('input');
+        inp.type = field.type;
+        inp.value = field.value;
+        inp.className = "w-full kompak-input";
+        inputContainer.appendChild(inp);
+      }
+
+      row.appendChild(label);
+      row.appendChild(inputContainer);
+      return row;
+    }
+
+    /* SECTION 4: Order Lines Table */
+    function renderOrderLines() {
+      const data = getCurrentDataset();
+      document.getElementById('orderLineSectionTitle').textContent = data.linesTitle;
+      document.getElementById('lineItemCountBadge').textContent = data.lines.length;
+      document.getElementById('btnAddLineText').textContent = currentMode === 'transaction' ? 'Tambahkan Produk' : 'Tambahkan Baris Personel';
+
+      const tbody = document.getElementById('lineItemsBody');
+      tbody.innerHTML = '';
+
+      let untaxedTotal = 0;
+
+      data.lines.forEach((item, index) => {
+        const lineSubtotal = item.qty * item.price;
+        untaxedTotal += lineSubtotal;
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition border-b border-kompak-borderLight";
+
+        tr.innerHTML = `
+          <td class="p-2.5 text-center text-kompak-muted font-mono text-xs">${index + 1}</td>
+          <td class="p-2.5">
+            <input type="text" value="${item.name}" onchange="updateLineField(${item.id}, 'name', this.value)" class="w-full bg-transparent hover:bg-white focus:bg-white kompak-input text-xs font-medium">
+          </td>
+          <td class="p-2.5 text-center">
+            <input type="number" min="1" value="${item.qty}" onchange="updateLineField(${item.id}, 'qty', this.value)" class="w-16 text-center kompak-input text-xs font-mono">
+          </td>
+          <td class="p-2.5 text-center">
+            <input type="text" value="${item.unit}" onchange="updateLineField(${item.id}, 'unit', this.value)" class="w-16 text-center kompak-input text-xs">
+          </td>
+          <td class="p-2.5 text-right">
+            ${currentMode === 'transaction' 
+              ? `<input type="number" value="${item.price}" onchange="updateLineField(${item.id}, 'price', this.value)" class="w-28 text-right kompak-input text-xs font-mono">`
+              : `<span class="text-xs text-kompak-muted">-</span>`
+            }
+          </td>
+          <td class="p-2.5 text-right col-tax-cell ${isTaxEnabled ? '' : 'hidden'}">
+            ${currentMode === 'transaction' ? '<span class="text-2xs bg-blue-50 text-kompak-primary border border-blue-200 px-1.5 py-0.5 rounded font-mono font-semibold">11%</span>' : '-'}
+          </td>
+          <td class="p-2.5 text-right font-medium col-subtotal-cell ${isTaxEnabled ? '' : 'hidden'}">
+            ${currentMode === 'transaction' 
+              ? `<span class="font-mono text-kompak-navy font-semibold">${formatIDR(lineSubtotal)}</span>` 
+              : `<span class="text-kompak-muted text-xs">${item.customSub || '-'}</span>`
+            }
+          </td>
+          <td class="p-2.5 text-center">
+            <button onclick="removeLineItem(${item.id})" class="text-slate-400 hover:text-rose-600 p-1 transition" title="Hapus baris">
+              <i class="fa-regular fa-trash-can text-xs"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      calculateSummaryTotals(untaxedTotal);
+    }
+
+    function toggleTaxCalculation(checked) {
+      isTaxEnabled = checked;
+      const taxCells = document.querySelectorAll('.col-tax-cell');
+      const subtotalCells = document.querySelectorAll('.col-subtotal-cell');
+      const taxSummaryRow = document.getElementById('summaryTaxRow');
+
+      taxCells.forEach(el => el.classList.toggle('hidden', !checked));
+      subtotalCells.forEach(el => el.classList.toggle('hidden', !checked));
+      if (taxSummaryRow) taxSummaryRow.classList.toggle('hidden', !checked);
+
+      renderOrderLines();
+      showToast(checked ? "Perhitungan PPN (11%) diaktifkan." : "Perhitungan Pajak dinonaktifkan.", 'info');
+    }
+
+    function updateLineField(id, key, value) {
+      const data = getCurrentDataset();
+      const row = data.lines.find(l => l.id === id);
+      if (row) {
+        if (key === 'qty' || key === 'price') {
+          row[key] = parseFloat(value) || 0;
+        } else {
+          row[key] = value;
+        }
+        renderOrderLines();
+      }
+    }
+
+    function addNewLineItem() {
+      const data = getCurrentDataset();
+      const newId = Date.now();
+      if (currentMode === 'transaction') {
+        data.lines.push({ id: newId, name: "Item Produk Baru...", qty: 1, unit: "Unit", price: 100000 });
+      } else {
+        data.lines.push({ id: newId, name: "Kontak PIC Baru...", qty: 1, unit: "Orang", price: 0, customSub: "Staff" });
+      }
+      renderOrderLines();
+      showToast("Baris baru berhasil ditambahkan.", "success");
+    }
+
+    function removeLineItem(id) {
+      const data = getCurrentDataset();
+      if (data.lines.length <= 1) {
+        showToast("Setidaknya formulir harus memiliki minimal 1 baris.", "warning");
+        return;
+      }
+      data.lines = data.lines.filter(l => l.id !== id);
+      renderOrderLines();
+      showToast("Baris berhasil dihapus.", "info");
+    }
+
+    /* SECTION 5: Footer & Totals Calculation */
+    function calculateSummaryTotals(untaxedAmount) {
+      const taxRate = isTaxEnabled ? 0.11 : 0;
+      const taxAmount = untaxedAmount * taxRate;
+      const grandTotal = untaxedAmount + taxAmount;
+
+      document.getElementById('summaryUntaxed').textContent = formatIDR(untaxedAmount);
+      document.getElementById('summaryTax').textContent = formatIDR(taxAmount);
+      document.getElementById('summaryTotal').textContent = formatIDR(grandTotal);
+    }
+
+    function formatIDR(amount) {
+      return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
+    }
+
+    function renderFooter() {
+      const data = getCurrentDataset();
+      document.getElementById('fieldTerms').value = data.terms;
+    }
+
+    /* SECTION 6: Activities Tracking */
+    function renderActivities() {
+      const data = getCurrentDataset();
+      const timeline = document.getElementById('timelineList');
+      timeline.innerHTML = '';
+
+      data.activities.forEach(act => {
+        const item = document.createElement('div');
+        item.className = "flex gap-3 text-xs";
+
+        let badgeIcon = 'fa-comment';
+        let badgeStyle = 'bg-blue-100 text-kompak-primary';
+
+        if (act.type === 'stage_change') {
+          badgeIcon = 'fa-arrow-right-arrow-left';
+          badgeStyle = 'bg-emerald-100 text-emerald-700';
+        } else if (act.type === 'system') {
+          badgeIcon = 'fa-gear';
+          badgeStyle = 'bg-slate-200 text-slate-700';
+        }
+
+        item.innerHTML = `
+          <div class="flex-shrink-0 w-8 h-8 rounded-full ${badgeStyle} flex items-center justify-center font-bold text-xs shadow-2xs">
+            <i class="fa-solid ${badgeIcon}"></i>
+          </div>
+          <div class="flex-1 bg-white p-3 rounded-xl border border-kompak-border shadow-2xs">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-kompak-navy">${act.user}</span>
+                <span class="text-3xs bg-slate-100 text-kompak-muted px-2 py-0.5 rounded-full font-medium">${act.role}</span>
+              </div>
+              <span class="text-3xs text-kompak-muted">${act.time}</span>
+            </div>
+            <p class="text-slate-700 text-xs leading-relaxed">${act.text}</p>
+          </div>
+        `;
+        timeline.appendChild(item);
+      });
+    }
+
+    function openChatterInput(type) {
+      const box = document.getElementById('chatterInputBox');
+      const label = document.getElementById('chatterInputLabel');
+      const txt = document.getElementById('txtChatterInput');
+      box.classList.remove('hidden');
+
+      if (type === 'activity') {
+        label.textContent = "Jadwalkan Aktivitas Mendatang";
+        txt.placeholder = "Rincian tugas, tanggal target tindak lanjut, dan nama PIC...";
+      } else if (type === 'log') {
+        label.textContent = "Catat Log Internal (Hanya Terlihat Tim Internal)";
+        txt.placeholder = "Catatan internal mengenai kesepakatan atau verifikasi...";
+      } else {
+        label.textContent = "Kirim Pesan ke Pengikut Dokumen";
+        txt.placeholder = "Tuliskan pesan resmi kepada pihak penanggung jawab...";
+      }
+      txt.focus();
+    }
+
+    function closeChatterInput() {
+      document.getElementById('chatterInputBox').classList.add('hidden');
+      document.getElementById('txtChatterInput').value = '';
+    }
+
+    function submitChatterEntry() {
+      const txt = document.getElementById('txtChatterInput');
+      const value = txt.value.trim();
+      if (!value) return;
+
+      const data = getCurrentDataset();
+      data.activities.unshift({
+        user: "Pengguna (Anda)",
+        role: "Operator",
+        time: "Baru saja",
+        type: "message",
+        text: value
+      });
+
+      closeChatterInput();
+      renderActivities();
+      showToast("Catatan aktivitas berhasil diposting.", "success");
+    }
+
+    function handlePrimaryAction() {
+      showToast("Aksi dokumen berhasil dieksekusi.", "success");
+    }
+
+    function handleSecondaryAction() {
+      showToast("Notifikasi berhasil dikirimkan ke mitra.", "info");
+    }
+
+    function handleCancel() {
+      const data = getCurrentDataset();
+      data.currentStageIndex = data.stages.length - 1;
+      renderStatusPipeline();
+      showToast("Status dokumen ditandai Batal/Arsip.", "warning");
+    }
+
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      let colors = 'bg-kompak-navy text-white border-slate-700';
+      let icon = '<i class="fa-solid fa-circle-info text-sky-400"></i>';
+
+      if (type === 'success') {
+        colors = 'bg-emerald-800 text-white border-emerald-600';
+        icon = '<i class="fa-solid fa-check text-emerald-300"></i>';
+      } else if (type === 'warning') {
+        colors = 'bg-amber-800 text-white border-amber-600';
+        icon = '<i class="fa-solid fa-triangle-exclamation text-amber-300"></i>';
+      }
+
+      toast.className = `fixed bottom-6 right-6 z-50 transform transition-all duration-300 flex items-center gap-2 px-3.5 py-2.5 rounded-lg shadow-lg border text-xs font-medium ${colors} translate-y-0 opacity-100`;
+      toast.innerHTML = `${icon} <span>${message}</span>`;
+
+      setTimeout(() => {
+        toast.className = 'fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2 px-3.5 py-2.5 rounded-lg shadow-lg border text-xs font-medium';
+      }, 3000);
+    }
+
+    // Auto initialize on DOM ready
+    window.addEventListener('DOMContentLoaded', () => {
+      initForm();
+    });
+  </script>
+</body>
+</html>
