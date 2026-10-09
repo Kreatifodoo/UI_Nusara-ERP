@@ -1,5 +1,5 @@
-# Prototipe UI lama (hasil generate) dikecualikan dari pemeriksaan format.
-exclude: ^(forms/|index\.html$|Business_Form_Template\.html$|nusara_erp_system\.html$)
+# Prototipe UI lama (hasil generate dan generate_forms.py) dikecualikan; semuanya diganti di Fase 2.
+exclude: ^(forms/|index\.html$|Business_Form_Template\.html$|nusara_erp_system\.html$|generate_forms\.py$)
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -13,5 +13,3 @@ repos:
     rev: v0.8.6
     hooks:
       - id: ruff
-        # generate_forms.py akan diganti di Fase 2.
-        exclude: ^generate_forms\.py$

@@ -1,0 +1,3 @@
+# Di Odoo, __init__.py hanya mengimpor submodul agar terdaftar, jadi F401 (impor tak terpakai) diabaikan di sana.
+[lint.per-file-ignores]
+"**/__init__.py" = ["F401"]
