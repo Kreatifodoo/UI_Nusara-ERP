@@ -38,3 +38,16 @@ Format: satu entri per keputusan. Status: **Diputuskan**, **Terbuka**, atau **Pe
 - **Status**: Terbuka
 - **Opsi hosting**: self-host Docker (VPS) atau Odoo.sh.
 - **Tenant**: Odoo memakai satu database per tenant lewat `dbfilter`/subdomain. Tentukan apakah Nusara dijual sebagai SaaS atau diinstal per klien.
+
+## D8. Penyesuaian atas modul OCA dan setup Indonesia di `nusara_base`
+- **Status**: Diputuskan (2026-10-09), ditemukan lewat test alur Procure-to-Pay
+- **Wizard PR ke RFQ**: wizard OCA `purchase.request.line.make.purchase.order` (cabang 19.0) memaksa `price_unit = 0.0` pada baris PO, sehingga harga dari daftar harga vendor tidak terbawa. `nusara_base` membuang kunci itu agar Odoo menghitungnya dari `product.supplierinfo`. Dicakup oleh test `test_procure_to_pay`. Tinjau lagi bila OCA memperbaikinya di hulu.
+- **Setup Indonesia**: `res.company.nusara_setup_indonesia()` (negara ID, IDR, COA `l10n_id`, price list bawaan ke IDR) sengaja eksplisit, bukan hook instalasi, karena memuat COA baru menghapus COA lama. Menolak berjalan bila perusahaan sudah punya transaksi akuntansi. Price list yang sudah punya aturan harga tidak diubah.
+- **`--without-demo`**: di Odoo 19 opsi ini boolean; gunakan `true`, bukan `all`.
+
+## D9. UI Nusara terhubung ke Odoo lewat JSON-2 (uji kelayakan Purchase Request)
+- **Status**: Terbukti layak untuk satu alur (2026-10-09). Keputusan jalur A atau B tetap di akhir Fase 2.
+- **Cara kerja**: halaman statis di `ui/live/` memanggil `POST /json/2/<model>/<metode>` pada alamat yang sama; nginx (`ui/nginx.conf.template`) hanya meneruskan `/json/2/`. Autentikasi bearer memakai API key pengguna sendiri. Rute JSON-2 Odoo 19 memakai `auth='bearer'` dan `save_session=False`, jadi tidak ada sesi cookie, dan CORS tidak aktif, sehingga proxy satu alamat diperlukan.
+- **Form mengikuti Odoo**: tombol header, status yang menampilkannya, hak manager (`res.users.has_group`), `is_editable` (field hanya bisa diedit saat draft), tombol statistik, kolom barang, default tanggal baris, dan chatter diambil dari definisi view Odoo/OCA, bukan dari tebakan. Untuk form lain, urutkan kerja: baca view XML dan `fields_get` modelnya, lalu petakan.
+- **Temuan saat uji**: tanggal baris wajib diisi (Odoo mengisinya otomatis di UI); label dan perilaku diselaraskan. API key tidak boleh ditaruh di berkas JavaScript; versi produksi perlu layar login dan penyimpanan kunci yang aman, atau BFF.
+- **Belum**: edit di status selain draft, pencarian dan filter lanjutan, pembagian hak per peran, mobile, dan 22 form lainnya. Memakai Tailwind dari CDN hanya untuk uji kelayakan.

@@ -1,0 +1,25 @@
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index purchase-request.html;
+
+    # Halaman statis UI.
+    location / {
+        try_files $uri $uri/ =404;
+        add_header Cache-Control "no-store";
+    }
+
+    # Satu-satunya jalur ke Odoo: API JSON-2 (autentikasi bearer dari browser, tanpa sesi).
+    # Antarmuka admin Odoo (/web, /odoo, XML-RPC) sengaja tidak diteruskan.
+    location /json/2/ {
+        proxy_pass http://${ODOO_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Odoo-Database ${ODOO_DB};
+        proxy_read_timeout 60s;
+        client_max_body_size 5m;
+    }
+}
