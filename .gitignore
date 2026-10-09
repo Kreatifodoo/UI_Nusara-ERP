@@ -1,0 +1,6 @@
+.DS_Store
+.env
+oca/
+__pycache__/
+*.py[cod]
+*.swp

@@ -1,0 +1,12 @@
+# Modul OCA yang dipakai Nusara, dikunci ke commit cabang 19.0.
+# Format: <nama-repo-OCA> <sha-commit>
+# Untuk memperbarui: jalankan `git ls-remote https://github.com/OCA/<repo>.git refs/heads/19.0`
+# lalu ganti SHA-nya di sini lewat pull request.
+purchase-workflow c63209c4f379458600fab82dc12cbd58551b0a0a
+account-financial-tools 31133bf90cbb832a6dc7c296b61c8ec47a49b9a9
+account-financial-reporting 232a773b3ee36980e28acf4a5ae1f1bbcb3a001d
+mis-builder 7d519f31e1a553d7a5499571a9146f7e3ea49ea4
+account-budgeting d811072d8e57f61f887e70e321fb8d2c640c6689
+server-tools ff085d56f10e5d1dc68ef85482eb3fc34a5b62d2
+account-reconcile 5402de2e9bb8e2cdd271d28c8d33a24eae3725c4
+web a3cc33289f39b08032fa8703f86ccd7633e50a05

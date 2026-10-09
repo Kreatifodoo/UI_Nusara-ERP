@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  ODOO_VERSION: "19.0"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Jalankan pre-commit
+        run: |
+          pip install pre-commit
+          pre-commit run --all-files --show-diff-on-failure
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: odoo
+          POSTGRES_PASSWORD: odoo
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U odoo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          load: true
+          tags: nusara-erp:ci
+          build-args: ODOO_VERSION=${{ env.ODOO_VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Jalankan test Odoo
+        run: |
+          set -o pipefail
+          rc=0
+          docker run --rm --network host \
+            -e HOST=localhost -e USER=odoo -e PASSWORD=odoo \
+            nusara-erp:ci \
+            odoo -d nusara_ci -i nusara_base \
+              --test-enable --test-tags /nusara_base \
+              --without-demo=all --stop-after-init --log-level=test \
+            2>&1 | tee odoo-test.log || rc=$?
+          # Ringkasan di halaman run (terbaca tanpa login ke GitHub).
+          {
+            echo "### Hasil test Odoo"
+            echo
+            echo '```'
+            grep -E "nusara_base|test_smoke|queries" odoo-test.log | tail -20 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$rc" -ne 0 ]; then
+            echo "Odoo keluar dengan kode $rc." >&2
+            exit "$rc"
+          fi
+          # Odoo tidak selalu keluar dengan kode error saat test gagal, jadi periksa lognya.
+          if grep -E " (ERROR|CRITICAL) " odoo-test.log; then
+            echo "Test Odoo gagal: ada baris ERROR/CRITICAL di log." >&2
+            exit 1
+          fi
+          # Pastikan test benar-benar berjalan, bukan modul yang tidak ditemukan lalu diabaikan.
+          if ! grep -qE "test_smoke|nusara_base: [0-9]+ tests" odoo-test.log; then
+            echo "Tidak ada jejak test nusara_base di log; test mungkin tidak berjalan." >&2
+            exit 1
+          fi

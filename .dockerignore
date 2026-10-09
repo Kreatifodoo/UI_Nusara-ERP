@@ -1,0 +1,11 @@
+.git
+.github
+.env
+oca
+forms
+docs
+deploy
+__pycache__
+**/__pycache__
+*.pyc
+.DS_Store
