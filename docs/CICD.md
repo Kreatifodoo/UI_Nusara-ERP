@@ -33,7 +33,9 @@ Pakai server khusus Nusara (bukan server bersama yang menjalankan sistem lain). 
 3. Buat folder `/opt/nusara` milik user tersebut, lalu salin `deploy/.env.example` menjadi `/opt/nusara/.env` dan isi nilainya.
 4. Buat pasangan kunci SSH khusus CI (`ssh-keygen -t ed25519`), pasang kunci publiknya di `~nusara-deploy/.ssh/authorized_keys`.
 5. Inisialisasi database sekali (belum bisa otomatis karena `update.sh` memakai `-u`):
-   `docker compose -f docker-compose.prod.yml run --rm odoo odoo -d <ODOO_DB> -i nusara_base --without-demo=all --stop-after-init`
+   `docker compose -f docker-compose.prod.yml run --rm odoo odoo -d <ODOO_DB> -i nusara_base --without-demo=true --stop-after-init`
+   Lalu terapkan setup Indonesia (negara, IDR, COA `l10n_id`, PPN). Hanya berjalan bila belum ada transaksi akuntansi:
+   `echo "env['res.company'].browse(1).nusara_setup_indonesia(); env.cr.commit()" | docker compose -f docker-compose.prod.yml run --rm -T odoo odoo shell -d <ODOO_DB> --no-http`
    Database yang dibuat lewat perintah ini punya login bawaan `admin` / `admin`. **Ganti password itu sebelum server dapat diakses dari internet.** Selama belum ada nginx, port Odoo hanya terbuka ke `127.0.0.1`, jadi ganti password lewat SSH tunnel (`ssh -L 8069:127.0.0.1:8069 <user>@<host>`, lalu buka `http://localhost:8069`).
 6. Pasang nginx sebagai reverse proxy dengan HTTPS: lalu lintas ke `127.0.0.1:8069`, dan path `/websocket` ke `127.0.0.1:8072`.
 

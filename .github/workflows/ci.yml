@@ -62,7 +62,7 @@ jobs:
             nusara-erp:ci \
             odoo -d nusara_ci -i nusara_base \
               --test-enable --test-tags /nusara_base \
-              --without-demo=all --stop-after-init --log-level=test \
+              --without-demo=true --stop-after-init --log-level=test \
             2>&1 | tee odoo-test.log || rc=$?
           # Ringkasan di halaman run (terbaca tanpa login ke GitHub).
           {
