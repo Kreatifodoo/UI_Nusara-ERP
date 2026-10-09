@@ -40,6 +40,8 @@ oca.lock                      # repo OCA 19.0 yang dipakai, dikunci ke commit
 docker/, docker-compose.yml   # image Odoo 19 + OCA dan lingkungan lokal
 config/odoo.conf              # konfigurasi Odoo
 deploy/                       # compose dan skrip update untuk server
+ui/                           # UI Nusara terhubung ke Odoo (nginx + halaman Purchase Request)
+scripts/                      # fetch-oca.sh (modul OCA) dan seed_demo.py (data contoh)
 .github/workflows/            # CI (lint + test) dan CD (image + deploy)
 docs/                         # peta modul, keputusan, dan CI/CD
 ```
@@ -57,16 +59,49 @@ cp .env.example .env
 2. Inisialisasi pertama: membuat database dan memasang modul Nusara Base (beberapa menit, sekali saja). Database manager di browser sengaja dimatikan, jadi database dibuat lewat perintah ini:
 
 ```bash
-docker compose run --rm odoo odoo -d nusara -i nusara_base --without-demo=all --stop-after-init
+docker compose run --rm odoo odoo -d nusara -i nusara_base --without-demo=true --stop-after-init
 ```
 
-3. Jalankan aplikasinya:
+3. Terapkan setup Indonesia pada perusahaan utama: negara Indonesia, mata uang IDR, COA `l10n_id` (termasuk PPN), dan price list bawaan ke IDR. **Hanya untuk database yang belum punya transaksi akuntansi**, karena memuat COA baru menghapus COA lama; metodenya menolak berjalan bila sudah ada transaksi. Aman dijalankan ulang.
+
+```bash
+echo "env['res.company'].browse(1).nusara_setup_indonesia(); env.cr.commit()" | docker compose run --rm -T odoo odoo shell -d nusara --no-http
+```
+
+4. Jalankan aplikasinya:
 
 ```bash
 docker compose up
 ```
 
-4. Buka http://localhost:8069 dan login dengan `admin` / `admin`, lalu **segera ganti password** di menu profil. Nama database di langkah 2 harus sama dengan `ODOO_DB` di `.env` (default `nusara`).
+5. Buka http://localhost:8069 dan login dengan `admin` / `admin`, lalu **segera ganti password** di menu profil. Nama database di langkah 2 dan 3 harus sama dengan `ODOO_DB` di `.env` (default `nusara`).
+
+Menjalankan test modul `nusara_base` (di database terpisah, tidak menyentuh data Anda):
+
+```bash
+docker compose run --rm --no-deps odoo odoo -d nusara_test -i nusara_base --test-enable --test-tags /nusara_base --without-demo=true --stop-after-init
+```
+
+## UI Nusara yang terhubung ke Odoo (uji kelayakan)
+
+Halaman **Purchase Request** di `ui/live/` bertransaksi langsung ke Odoo lewat API JSON-2, dengan form yang mengikuti form Odoo (tombol menurut status dan hak manager, bilah status, tombol statistik, tabel barang, chatter). Alurnya: buat PR → ajukan → setujui → buat RFQ → konfirmasi PO. Hanya untuk pengembangan lokal (HTTP, hanya `127.0.0.1`).
+
+1. Jalankan tumpukan (layanan `ui` ikut menyala di http://localhost:8080):
+
+```bash
+docker compose up -d
+```
+
+2. Opsional, bila database belum punya vendor dan produk: isi data contoh (vendor, produk, harga vendor, setup Indonesia). Menolak berjalan bila sudah ada transaksi akuntansi.
+
+```bash
+docker compose run --rm -T odoo odoo shell -d nusara --no-http < scripts/seed_demo.py
+```
+
+3. Buat API key milik Anda di Odoo (http://localhost:8069): klik nama Anda → **Preferences** → **Account Security** → **New API Key**. Salin key-nya (hanya tampil sekali).
+4. Buka http://localhost:8080, tempel API key, lalu **Hubungkan**. Key disimpan di `sessionStorage` tab itu saja dan hilang saat tab ditutup.
+
+Nginx pada layanan `ui` hanya meneruskan `/json/2/` ke Odoo, sehingga antarmuka admin Odoo tidak terbuka lewat port itu dan CORS tidak diperlukan.
 
 Detail CI/CD dan penyiapan server ada di [docs/CICD.md](docs/CICD.md).
 

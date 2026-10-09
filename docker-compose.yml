@@ -31,13 +31,28 @@ services:
       ADMIN_PASSWD: ${ADMIN_PASSWD:?Isi ADMIN_PASSWD di file .env}
     # Hanya dari Mac ini (bukan jaringan Wi-Fi/LAN), karena database baru masih memakai login admin/admin.
     ports:
-      - "127.0.0.1:8069:8069"
+      - "127.0.0.1:${ODOO_PORT:-8069}:8069"
     volumes:
       - odoo-data:/var/lib/odoo
       # Modul Nusara dipasang dari folder lokal agar perubahan langsung terlihat.
       - ./addons:/mnt/extra-addons
     # Database manager dimatikan (list_db = False); database dibuat lewat perintah, lihat README.
     command: odoo --database=${ODOO_DB:-nusara}
+
+  # UI Nusara yang terhubung ke Odoo (uji kelayakan). Hanya untuk pengembangan lokal.
+  # Menyajikan ui/live dan meneruskan /json/2/ ke Odoo pada alamat yang sama (tanpa CORS).
+  ui:
+    image: nginx:1.27-alpine
+    depends_on:
+      - odoo
+    environment:
+      ODOO_UPSTREAM: odoo:8069
+      ODOO_DB: ${ODOO_DB:-nusara}
+    ports:
+      - "127.0.0.1:${UI_PORT:-8080}:80"
+    volumes:
+      - ./ui/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./ui/live:/usr/share/nginx/html:ro
 
 volumes:
   db-data:
