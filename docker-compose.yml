@@ -28,14 +28,16 @@ services:
       HOST: db
       USER: odoo
       PASSWORD: ${DB_PASSWORD}
+      ADMIN_PASSWD: ${ADMIN_PASSWD:?Isi ADMIN_PASSWD di file .env}
+    # Hanya dari Mac ini (bukan jaringan Wi-Fi/LAN), karena database baru masih memakai login admin/admin.
     ports:
-      - "8069:8069"
+      - "127.0.0.1:8069:8069"
     volumes:
       - odoo-data:/var/lib/odoo
       # Modul Nusara dipasang dari folder lokal agar perubahan langsung terlihat.
       - ./addons:/mnt/extra-addons
     # Database manager dimatikan (list_db = False); database dibuat lewat perintah, lihat README.
-    command: odoo --admin-passwd=${ADMIN_PASSWD:?Isi ADMIN_PASSWD di file .env} --database=${ODOO_DB:-nusara}
+    command: odoo --database=${ODOO_DB:-nusara}
 
 volumes:
   db-data:
