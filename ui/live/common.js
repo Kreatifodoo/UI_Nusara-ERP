@@ -246,6 +246,20 @@ export const referenceCurrencies = () => reference("currencies", () => searchRea
 export const referenceCountries = () => reference("countries", () => searchRead("res.country", [], ["display_name", "code"], { order: "name" }));
 export const referenceCategories = () => reference("categories", () => searchRead("product.category", [], ["display_name"], { order: "complete_name" }));
 export const referenceUoms = () => reference("uoms", () => searchRead("uom.uom", [], ["display_name"], { order: "name", limit: 100 }));
+/** Profil aset (OCA account_asset_management); null bila modul tidak terpasang. */
+export const referenceAssetProfiles = () =>
+  reference("asset-profiles", () => searchRead("account.asset.profile", [], ["display_name"], { order: "name" }).catch(() => null));
+export const referencePayableAccounts = () =>
+  reference("payable-accounts", () => searchRead("account.account", [["account_type", "=", "liability_payable"]], ["display_name"], { order: "code" }));
+export const referenceFiscalPositions = () => reference("fiscal-positions", () => searchRead("account.fiscal.position", [], ["display_name"], { order: "sequence, name" }));
+export const referenceJournals = (type) => reference(`journals-${type}`, () => searchRead("account.journal", [["type", "=", type]], ["display_name"], { order: "sequence, code" }));
+/** Id kategori bawaan Odoo (Goods dan Services) menurut xml id, bukan nama, karena nama bisa diterjemahkan. */
+export const referenceDefaultCategories = () =>
+  reference("default-categories", async () => {
+    const rows = await searchRead("ir.model.data", [["module", "=", "product"], ["name", "in", ["product_category_goods", "product_category_services"]]], ["name", "res_id"]);
+    const byName = Object.fromEntries(rows.map((r) => [r.name, r.res_id]));
+    return { goods: byName.product_category_goods ?? null, services: byName.product_category_services ?? null };
+  });
 export const referenceTaxes = (type) => reference(`taxes-${type}`, () => searchRead("account.tax", [["type_tax_use", "=", type]], ["display_name"], { order: "sequence, id" }));
 export const referenceSelection = (model, field) =>
   reference(`sel-${model}-${field}`, async () => {
@@ -359,7 +373,7 @@ export function runLookup(input, delay = 0) {
   clearTimeout(lookupTimer);
   lookupTimer = setTimeout(async () => {
     try {
-      const items = await def.search(def.isChosen(input) ? "" : input.value.trim());
+      const items = await def.search(def.isChosen(input) ? "" : input.value.trim(), input);
       if (lookup !== current || current.seq !== mine) return; // jawaban usang
       current.items = items;
       current.active = items.length ? 0 : -1;
@@ -425,6 +439,60 @@ document.addEventListener("keydown", (event) => {
     closeLookup();
   }
 });
+
+/** Pencarian akun untuk kotak saran: kode atau nama, opsional dibatasi jenis akun. */
+export const searchAccounts = (query, types = null) =>
+  searchRead(
+    "account.account",
+    [...(types ? [["account_type", "in", types]] : []), ...(query ? ["|", ["code", "ilike", query], ["name", "ilike", query]] : [])],
+    ["display_name", "account_type"],
+    { limit: 10, order: "code" },
+  );
+export const ACCOUNT_TYPE_LABELS = {
+  expense: "Beban", expense_direct_cost: "Beban Pokok", expense_other: "Beban Lain", expense_depreciation: "Penyusutan", asset_fixed: "Aset Tetap",
+  asset_current: "Aset Lancar", asset_non_current: "Aset Tidak Lancar", asset_prepayments: "Biaya Dibayar Dimuka", liability_current: "Kewajiban Lancar",
+  liability_payable: "Hutang", asset_receivable: "Piutang", asset_cash: "Kas dan Bank", income: "Pendapatan", income_other: "Pendapatan Lain",
+};
+
+/* ---------- Item jurnal ---------- */
+
+/** Baris jurnal (account.move.line) sebuah entri: dipakai tagihan dan pembayaran untuk memperlihatkan jurnal yang tercipta. */
+export const loadJournalItems = (moveId) =>
+  moveId
+    ? searchRead("account.move.line", [["move_id", "=", moveId]], ["account_id", "name", "partner_id", "debit", "credit", "matching_number"], { order: "id" })
+    : Promise.resolve([]);
+
+export function journalHtml(items, currency, { title = "Item Jurnal", journal = "", state = "" } = {}) {
+  if (!items.length) return "";
+  const debit = items.reduce((sum, l) => sum + l.debit, 0);
+  const credit = items.reduce((sum, l) => sum + l.credit, 0);
+  const balanced = Math.abs(debit - credit) < 0.005;
+  const rows = items
+    .map(
+      (l) => `<tr>
+        <td class="py-2 px-4 text-sm">${esc(l.account_id?.[1])}</td>
+        <td class="py-2 px-4 text-sm">${esc(l.name || "")}</td>
+        <td class="py-2 px-4 text-sm">${esc(l.partner_id?.[1] ?? "")}</td>
+        <td class="py-2 px-4 text-sm text-right">${l.debit ? money(l.debit, currency) : ""}</td>
+        <td class="py-2 px-4 text-sm text-right">${l.credit ? money(l.credit, currency) : ""}</td>
+        <td class="py-2 px-4 text-sm text-gray-500">${esc(l.matching_number || "")}</td>
+      </tr>`,
+    )
+    .join("");
+  const meta = [journal, state === "draft" ? "belum diposting" : ""].filter(Boolean).join(" · ");
+  return `<section id="journal-items" class="bg-white rounded-xl shadow-sm border border-gray-200 mt-4 overflow-x-auto">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
+      <span class="text-sm font-semibold">${esc(title)}${meta ? ` <span class="font-normal text-gray-500">(${esc(meta)})</span>` : ""}</span>
+      <span class="text-xs font-medium ${balanced ? "text-emerald-600" : "text-rose-600"}">${balanced ? "Seimbang" : "Tidak seimbang"}</span>
+    </div>
+    <table class="w-full text-left"><thead class="bg-gray-50"><tr>${["Akun", "Label", "Mitra", "Debit", "Kredit", "Rekonsiliasi"]
+      .map((h, i) => `<th class="py-2 px-4 text-xs font-semibold text-gray-600 uppercase ${i === 3 || i === 4 ? "text-right" : ""}">${h}</th>`)
+      .join("")}</tr></thead>
+      <tbody class="divide-y divide-gray-100">${rows}</tbody>
+      <tfoot class="bg-gray-50 font-semibold"><tr><td colspan="3" class="py-2 px-4 text-sm">Total</td>
+        <td class="py-2 px-4 text-sm text-right">${money(debit, currency)}</td><td class="py-2 px-4 text-sm text-right">${money(credit, currency)}</td><td></td></tr></tfoot></table>
+  </section>`;
+}
 
 /* ---------- Chatter ---------- */
 

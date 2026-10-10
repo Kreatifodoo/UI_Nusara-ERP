@@ -31,7 +31,7 @@ export const MENU = [
       {
         title: "Master",
         items: [
-          { title: "Product Master", route: "product?state=all" }, { title: "Product Category", odoo: "product.category" },
+          { title: "Product Master", route: "product?state=all" }, { title: "Product Category", route: "category" },
           { title: "Reorder Level", odoo: "stock.warehouse.orderpoint" }, { title: "Put away Rules", odoo: "stock.putaway.rule" },
           { title: "Unit of Measurement Master", odoo: "uom.uom" }, { title: "Lot & Serial Number Master", odoo: "stock.lot" },
           { title: "Warehouse & Location Master", odoo: "stock.warehouse" },
@@ -114,14 +114,14 @@ export const MENU = [
         title: "Master",
         items: [
           { title: "Chart of Account", odoo: "account.account" }, { title: "Customer Master", odoo: "res.partner" }, { title: "Vendor Master", route: "vendor" },
-          { title: "Product Master", route: "product?state=all" }, { title: "Product Category", odoo: "product.category" }, { title: "Tax Master", odoo: "account.tax" },
+          { title: "Product Master", route: "product?state=all" }, { title: "Product Category", route: "category" }, { title: "Tax Master", odoo: "account.tax" },
           { title: "Currencies", odoo: "res.currency" }, { title: "Jurnal", odoo: "account.journal" }, { title: "Asset Model", odoo: "account.asset" },
           { title: "Budget Plan Master", odoo: "account.budget" }, { title: "Analitic Account", odoo: "account.analytic.account" },
         ],
       },
       { title: "Customers", items: [{ title: "Customer Invoice", odoo: "account.move" }, { title: "Credit Note", odoo: "account.move" }, { title: "Customer Payment", odoo: "account.payment" }] },
       { title: "Vendors", items: [{ title: "Vendor Bills", route: "bill" }, { title: "Debit Note", odoo: "account.move" }, { title: "Vendor Payment", route: "payment" }] },
-      { title: "Jurnal Entry", odoo: "account.move" },
+      { title: "Jurnal Entry", route: "journal" },
       { title: "Asset", odoo: "account.asset" },
       { title: "Budget", odoo: "account.budget" },
       { title: "Bank Transaction", odoo: "account.bank.statement" },

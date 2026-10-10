@@ -1,5 +1,9 @@
+import logging
+
 from odoo import _, models
 from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 class ResCompany(models.Model):
@@ -42,4 +46,40 @@ class ResCompany(models.Model):
                     ("currency_id", "!=", idr.id),
                 ]
             ).write({"currency_id": idr.id})
+            company.nusara_setup_inventory_valuation()
+        return True
+
+    def nusara_setup_inventory_valuation(self):
+        """Valuasi persediaan perpetual dengan biaya rata-rata (AVCO) untuk kategori Goods.
+
+        Bawaan Odoo 19 adalah periodik dengan harga standar: tagihan vendor atas barang stok
+        langsung mendebit akun beban (COGS) dan persediaan baru disesuaikan saat tutup periode.
+        Untuk Indonesia (PSAK 14) persediaan dicatat saat barang ditagih: tagihan mendebit akun
+        Persediaan, dan biaya rata-rata mengikuti harga beli. Odoo 19 tidak membuat jurnal saat
+        penerimaan barang; jurnal valuasi muncul saat tagihan vendor diposting.
+
+        Hanya kategori Goods yang diubah (Services dan Expenses tidak menyimpan stok).
+        Jurnal yang sudah ada tidak diubah; hanya transaksi berikutnya yang memakai aturan ini.
+        Aman dijalankan ulang.
+        """
+        goods = self.env.ref("product.product_category_goods", raise_if_not_found=False)
+        for company in self:
+            company.write({"inventory_valuation": "real_time", "anglo_saxon_accounting": True})
+            if goods:
+                goods.with_company(company).write(
+                    {"property_valuation": "real_time", "property_cost_method": "average"}
+                )
+            valued = self.env["stock.move"].search_count(
+                [
+                    ("company_id", "=", company.id),
+                    ("state", "=", "done"),
+                    ("product_id.is_storable", "=", True),
+                ]
+            )
+            if valued:
+                _logger.warning(
+                    "Perusahaan %s sudah punya %s pergerakan barang stok; jurnal lama tidak diubah.",
+                    company.name,
+                    valued,
+                )
         return True

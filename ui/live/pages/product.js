@@ -2,22 +2,30 @@
 // kategori, pajak, kebijakan kontrol tagihan, deskripsi, dan tabel vendor (harga vendor). Harga vendor
 // di tabel itu adalah yang dipakai otomatis oleh RFQ.
 import {
-  INPUT, app, call, cell, changedValues, chatterHtml, checkboxField, esc, fieldBlock, fieldValue, filterSelect, guarded, loadMessages, money,
-  pageHeader, readOne, referenceCategories, referenceSelection, referenceTaxes, referenceUoms, rowLink, searchBox, searchRead,
-  selectOptions, statTiles, table, toast, button,
+  ACCOUNT_TYPE_LABELS, INPUT, app, call, cell, changedValues, chatterHtml, checkboxField, closeLookup, esc, fieldBlock, fieldValue, filterSelect,
+  guarded, loadMessages, money, pageHeader, readOne, referenceCategories, referenceDefaultCategories, referenceSelection, referenceTaxes,
+  referenceUoms, registerLookup, rowLink, runLookup, searchAccounts, searchBox, searchRead, selectOptions, statTiles, table, toast, button,
 } from "../common.js";
 
 const FILTERS = [["purchase", "Dapat dibeli"], ["sale", "Dapat dijual"], ["all", "Semua produk"], ["archived", "Diarsipkan"]];
 const FIELDS = [
   "name", "type", "is_storable", "sale_ok", "purchase_ok", "purchase_request", "uom_id", "default_code", "barcode", "categ_id", "list_price",
   "standard_price", "taxes_id", "supplier_taxes_id", "purchase_method", "description_purchase", "description_sale",
+  "property_account_expense_id", "property_account_income_id",
 ];
+// Akun yang menimpa akun kategori; kosong berarti mengikuti kategori.
+const ACCOUNT_KEYS = {
+  property_account_expense_id: { label: "Akun Beban", types: ["expense", "expense_direct_cost", "expense_other", "asset_fixed", "asset_current"] },
+  property_account_income_id: { label: "Akun Pendapatan", types: ["income", "income_other"] },
+};
+const VALUATION = { periodic: "periodik", real_time: "perpetual" };
+const COSTING = { standard: "harga standar", fifo: "FIFO", average: "rata-rata (AVCO)" };
 const TEXT_KEYS = ["name", "default_code", "barcode", "description_purchase", "description_sale"];
 const ID_KEYS = ["uom_id", "categ_id"];
 const TYPE_LABELS = { consu: "Barang", service: "Jasa", combo: "Combo" };
 const POLICY_LABELS = { purchase: "Berdasarkan kuantitas yang dipesan", receive: "Berdasarkan kuantitas yang diterima" };
 
-let form = null; // { id, values, initial }
+let form = null; // { id, values, initial, taxesTouched, categTouched, pending }
 let last = { sub: "", query: new URLSearchParams() };
 
 export const leave = () => {
@@ -25,7 +33,24 @@ export const leave = () => {
 };
 const reload = () => render(last.sub, last.query);
 
+// Jasa tidak punya penerimaan barang: ditagih menurut kuantitas yang dipesan (bawaan Odoo). Dengan "diterima", tagihan jasa bernilai nol.
+const purchaseMethodFor = (type) => (type === "service" ? "purchase" : "receive");
+const categoryFor = (type, defaults) => (type === "service" ? defaults.services : defaults.goods);
 const sorted = (ids) => [...ids].sort((a, b) => a - b);
+const asRef = (value) => (Array.isArray(value) ? { id: value[0], display_name: value[1] } : null);
+/** Nilai form dengan akun berupa id, untuk dibandingkan dan dikirim ke Odoo. */
+const flat = (values) => ({ ...values, ...Object.fromEntries(Object.keys(ACCOUNT_KEYS).map((key) => [key, values[key]?.id ?? null])) });
+
+registerLookup("prod-account", {
+  search: (q, input) => searchAccounts(q, ACCOUNT_KEYS[input.dataset.key].types),
+  sub: (r) => ACCOUNT_TYPE_LABELS[r.account_type] ?? "",
+  isChosen: (input) => form?.values[input.dataset.key]?.display_name === input.value,
+  choose: (input, item) => {
+    form.values[input.dataset.key] = item;
+    form.pending.delete(input.dataset.key);
+    input.value = item.display_name;
+  },
+});
 /** Hasil default_get untuk many2many berupa perintah [[6, 0, ids]]. */
 const idsFromCommands = (commands) => sorted((commands ?? []).flatMap((c) => (Array.isArray(c) && c[0] === 6 ? c[2] : [])));
 
@@ -40,13 +65,14 @@ const normalize = (record) => {
   values.standard_price = record.standard_price ?? 0;
   values.taxes_id = sorted(record.taxes_id ?? []);
   values.supplier_taxes_id = sorted(record.supplier_taxes_id ?? []);
+  for (const key of Object.keys(ACCOUNT_KEYS)) values[key] = asRef(record[key]);
   return values;
 };
 
 /** Nilai untuk Odoo: teks/relasi kosong menjadi false; pajak menjadi perintah "ganti seluruhnya". */
 const toOdoo = (key, value) => {
   if (key === "taxes_id" || key === "supplier_taxes_id") return [[6, 0, value]];
-  if (ID_KEYS.includes(key)) return value || false;
+  if (ID_KEYS.includes(key) || key in ACCOUNT_KEYS) return value || false;
   if (TEXT_KEYS.includes(key)) return value === "" ? false : value;
   return value;
 };
@@ -66,6 +92,8 @@ async function renderList(query) {
   else if (filter === "sale") domain.push(["sale_ok", "=", true]);
   else if (filter === "archived") domain.push(["active", "=", false]);
   if (text) domain.push("|", "|", ["name", "ilike", text], ["default_code", "ilike", text], ["barcode", "ilike", text]);
+  const category = Number(query.get("category")) || null;
+  if (category) domain.push(["categ_id", "child_of", category]);
   const rows = await searchRead("product.template", domain, ["name", "default_code", "categ_id", "type", "is_storable", "list_price", "standard_price", "qty_available", "uom_id"], {
     order: "name", limit: 100, context: { active_test: filter !== "archived" },
   });
@@ -89,6 +117,9 @@ async function renderList(query) {
        <button data-action="refresh" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50" aria-label="Muat ulang"><i class="fas fa-rotate"></i></button>
        <a href="#/product/new" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"><i class="fas fa-plus mr-2"></i>Produk Baru</a>`,
     ) +
+    (category
+      ? `<p class="text-sm text-gray-500 mb-3">Difilter per kategori. <a href="#/product?state=${esc(filter)}" class="text-indigo-600 hover:underline">Tampilkan semua</a></p>`
+      : "") +
     table(
       [{ label: "Kode" }, { label: "Nama" }, { label: "Kategori" }, { label: "Tipe" }, { label: "Harga Jual", right: true }, { label: "Biaya", right: true }, { label: "Stok", right: true }],
       body,
@@ -124,11 +155,32 @@ function vendorsTable(sellers, productId) {
     ${table([{ label: "Pemasok" }, { label: "Kode Pemasok" }, { label: "Jml Min", right: true }, { label: "Harga", right: true }, { label: "Diskon", right: true }, { label: "Lead Time", right: true }], rows, "Belum ada vendor. Tambahkan harga vendor agar RFQ terisi otomatis.")}</section>`;
 }
 
+/** Akun yang didebit saat tagihan vendor produk ini diposting, menurut tipe produk dan valuasi kategorinya. */
+function accountingNote(v, category) {
+  if (!category) {
+    return { tone: "warn", html: "Produk belum punya kategori: Odoo memakai akun bawaan perusahaan, dan barang stok tidak masuk ke akun Persediaan. Pilih kategori." };
+  }
+  const expense = v.property_account_expense_id?.display_name ?? category.property_account_expense_categ_id?.[1] ?? "akun beban bawaan";
+  const stock = category.property_stock_valuation_account_id?.[1] ?? "akun Persediaan";
+  if (v.type === "consu" && v.is_storable) {
+    if (category.property_valuation === "real_time") {
+      return { tone: "info", html: `Valuasi <b>perpetual</b>, biaya ${COSTING[category.property_cost_method] ?? ""}: tagihan vendor mendebit <b>${esc(stock)}</b>.` };
+    }
+    return {
+      tone: "warn",
+      html: `Valuasi kategori <b>${esc(VALUATION[category.property_valuation] ?? category.property_valuation)}</b>: tagihan vendor langsung mendebit <b>${esc(expense)}</b>, bukan ${esc(stock)}. Ubah valuasi di <a href="#/category/${category.id}" class="underline">kategori ${esc(category.display_name)}</a>.`,
+    };
+  }
+  return { tone: "info", html: `Barang tidak dilacak stoknya atau jasa: tagihan vendor mendebit <b>${esc(expense)}</b>.` };
+}
+
 async function renderForm(id) {
+  closeLookup();
   app.innerHTML = '<p class="text-sm text-gray-500">Memuat...</p>';
-  const [uoms, categories, saleTaxes, purchaseTaxes, typeOptions, policyOptions] = await Promise.all([
+  const [uoms, categories, saleTaxes, purchaseTaxes, typeOptions, policyOptions, defaults, categoryDetails] = await Promise.all([
     referenceUoms(), referenceCategories(), referenceTaxes("sale"), referenceTaxes("purchase"),
-    referenceSelection("product.template", "type"), referenceSelection("product.template", "purchase_method"),
+    referenceSelection("product.template", "type"), referenceSelection("product.template", "purchase_method"), referenceDefaultCategories(),
+    searchRead("product.category", [], ["display_name", "property_valuation", "property_cost_method", "property_stock_valuation_account_id", "property_account_expense_categ_id"]),
   ]);
   let product = null;
   let sellers = [];
@@ -146,18 +198,27 @@ async function renderForm(id) {
     let values;
     if (product) values = normalize(product);
     else {
-      const defaults = await call("product.template", "default_get", {
+      const odooDefaults = await call("product.template", "default_get", {
         fields: ["type", "uom_id", "taxes_id", "supplier_taxes_id", "sale_ok", "purchase_ok", "purchase_method"],
       });
-      values = normalize({ ...defaults, taxes_id: idsFromCommands(defaults.taxes_id), supplier_taxes_id: idsFromCommands(defaults.supplier_taxes_id), purchase_ok: true, sale_ok: true });
+      values = normalize({ ...odooDefaults, taxes_id: idsFromCommands(odooDefaults.taxes_id), supplier_taxes_id: idsFromCommands(odooDefaults.supplier_taxes_id), purchase_ok: true, sale_ok: true });
+      values.categ_id = categoryFor(values.type, defaults); // kategori bawaan menurut tipe; tanpa kategori, barang stok tidak masuk Persediaan
+      values.is_storable = values.type === "consu"; // barang yang dibeli umumnya stok; tanpa ini tagihan langsung dibebankan
+      values.purchase_method = purchaseMethodFor(values.type);
     }
-    form = { id: product?.id ?? null, values, initial: product ? { ...values } : null, taxesTouched: new Set() };
+    form = { id: product?.id ?? null, values, initial: product ? flat(values) : null, taxesTouched: new Set(), categTouched: false, pending: new Set() };
   }
   const v = form.values;
   const input = (key, extra = "") => `<input data-value="${key}" value="${esc(v[key])}" ${extra} class="${INPUT}">`;
   const number = (key) => `<input type="number" min="0" step="any" data-value="${key}" data-kind="number" value="${esc(v[key])}" class="${INPUT}">`;
   const types = typeOptions.filter(([k]) => k !== "combo" || v.type === "combo");
   const title = product ? esc(product.name) : "Produk Baru";
+  const note = accountingNote(v, categoryDetails.find((c) => c.id === v.categ_id));
+  const accountOverride = (key) =>
+    fieldBlock(
+      `${ACCOUNT_KEYS[key].label} (menimpa kategori)`,
+      `<input data-lookup="prod-account" data-key="${key}" autocomplete="off" role="combobox" aria-autocomplete="list" value="${esc(v[key]?.display_name ?? "")}" placeholder="Ikuti kategori" class="${INPUT}">`,
+    );
 
   app.innerHTML = `
     <div class="text-sm text-gray-500 mb-2"><a href="#/product" class="hover:text-indigo-600">Product Master</a> / ${title}</div>
@@ -190,6 +251,10 @@ async function renderForm(id) {
       ${fieldBlock("Biaya", number("standard_price"))}
       ${fieldBlock("Pajak Penjualan", taxChecklist("taxes_id", saleTaxes, v.taxes_id))}
       ${fieldBlock("Pajak Pembelian", taxChecklist("supplier_taxes_id", purchaseTaxes, v.supplier_taxes_id))}
+      <div class="md:col-span-2 border-t border-gray-100 pt-4 text-sm font-semibold text-gray-700">Akuntansi</div>
+      ${accountOverride("property_account_expense_id")}
+      ${accountOverride("property_account_income_id")}
+      <p class="md:col-span-2 text-sm rounded-lg px-4 py-3 border ${note.tone === "warn" ? "text-amber-900 bg-amber-50 border-amber-200" : "text-sky-900 bg-sky-50 border-sky-200"}">${note.html}</p>
       ${v.purchase_ok
         ? `<div class="md:col-span-2 border-t border-gray-100 pt-4 text-sm font-semibold text-gray-700">Pembelian</div>
            ${fieldBlock("Kebijakan Kontrol Tagihan", `<select data-value="purchase_method" class="${INPUT}">${policyOptions.map(([k]) => `<option value="${esc(k)}" ${k === v.purchase_method ? "selected" : ""}>${esc(POLICY_LABELS[k] ?? k)}</option>`).join("")}</select>`)}
@@ -212,20 +277,22 @@ async function persist() {
   for (const key of ["list_price", "standard_price"]) if (v[key] === "") v[key] = 0;
   if (!(Number(v.list_price) >= 0)) throw new Error("Harga jual tidak boleh negatif.");
   if (!(Number(v.standard_price) >= 0)) throw new Error("Biaya tidak boleh negatif.");
+  if (form.pending.size) throw new Error("Pilih akun dari kotak saran, atau kosongkan isiannya.");
   if (v.type !== "consu") v.is_storable = false;
+  const current = flat(v);
   if (!form.id) {
     const vals = {};
-    for (const key of Object.keys(v)) {
+    for (const key of Object.keys(current)) {
       if ((key === "taxes_id" || key === "supplier_taxes_id") && !form.taxesTouched.has(key)) continue; // pajak bawaan perusahaan
       if (!v.purchase_ok && ["purchase_method", "description_purchase"].includes(key)) continue;
       if (!v.sale_ok && key === "description_sale") continue;
-      if (v[key] === "" || v[key] === null) continue;
-      vals[key] = toOdoo(key, v[key]);
+      if (current[key] === "" || current[key] === null) continue;
+      vals[key] = toOdoo(key, current[key]);
     }
     const [newId] = await call("product.template", "create", { vals_list: [vals] });
     return newId;
   }
-  const changed = changedValues(v, form.initial, Object.keys(v));
+  const changed = changedValues(current, form.initial, Object.keys(current));
   const vals = Object.fromEntries(Object.entries(changed).map(([k, value]) => [k, toOdoo(k, value)]));
   if (Object.keys(vals).length) await call("product.template", "write", { ids: [form.id], vals });
   return form.id;
@@ -258,7 +325,16 @@ export async function onClick(event, el) {
 }
 
 export function onInput(event, el) {
-  if (!el.dataset.value || !form) return;
+  if (!form) return;
+  if (el.dataset.lookup === "prod-account") {
+    const key = el.dataset.key;
+    form.values[key] = null;
+    if (el.value.trim()) form.pending.add(key);
+    else form.pending.delete(key);
+    runLookup(el, 250);
+    return;
+  }
+  if (!el.dataset.value) return;
   form.values[el.dataset.value] = fieldValue(el);
 }
 
@@ -274,9 +350,17 @@ export async function onChange(event, el) {
   if (!el.dataset.value) return;
   const key = el.dataset.value;
   form.values[key] = fieldValue(el);
-  // Perubahan yang mengubah tata letak: tipe, dapat dibeli, dapat dijual.
-  if (["type", "purchase_ok", "sale_ok"].includes(key)) {
-    if (key === "type" && form.values.type !== "consu") form.values.is_storable = false;
+  if (key === "categ_id") form.categTouched = true;
+  // Perubahan yang mengubah tata letak atau ringkasan akuntansi: tipe, lacak stok, kategori, dapat dibeli/dijual.
+  if (["type", "purchase_ok", "sale_ok", "is_storable", "categ_id"].includes(key)) {
+    if (key === "type") {
+      if (form.values.type !== "consu") form.values.is_storable = false;
+      if (!form.id) {
+        form.values.is_storable = form.values.type === "consu";
+        form.values.purchase_method = purchaseMethodFor(form.values.type);
+      }
+      if (!form.id && !form.categTouched) form.values.categ_id = categoryFor(form.values.type, await referenceDefaultCategories());
+    }
     await reload();
   }
 }

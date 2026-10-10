@@ -2,8 +2,9 @@
 // Cancel, Reset to Draft; bilah status draft/posted; status pembayaran; total, sisa tagihan; dan dialog
 // "Register Payment" yang memakai wizard account.payment.register.
 import {
-  INPUT, actionBar, app, badge, call, cell, chatterHtml, closeLookup, closeModal, dateText, esc, fieldBlock, filterSelect, guarded,
-  loadMessages, money, openModal, pageHeader, readOne, readonlyValue, rowLink, searchRead, statTiles, statusbar, table, toast, today,
+  ACCOUNT_TYPE_LABELS, INPUT, actionBar, app, badge, call, cell, chatterHtml, closeLookup, closeModal, dateText, esc, fieldBlock, filterSelect, guarded,
+  journalHtml, loadJournalItems, loadMessages, money, openModal, pageHeader, readOne, readonlyValue, referenceAssetProfiles, registerLookup,
+  rowLink, runLookup, searchAccounts, searchRead, selectOptions, statTiles, statusbar, table, toast, today,
 } from "../common.js";
 
 const STATES = {
@@ -30,8 +31,21 @@ const BUTTONS = [
 ];
 const DONE_MESSAGE = { post: "Tagihan dikonfirmasi.", cancel: "Tagihan dibatalkan.", reset: "Tagihan dikembalikan ke draft." };
 
-let form = null; // { id, ref, invoice_date, date, invoice_date_due }
+
+let form = null; // { id, ref, invoice_date, date, invoice_date_due, lines: Map(id -> { account, profile }), initialLines }
 let pay = null; // { id wizard, context, billId }
+
+// Akun baris tagihan bisa diganti saat draft (mis. ke akun Aset Tetap agar profil aset dan aset terbentuk).
+const lineEdit = (input) => form?.lines?.get(Number(input.dataset.line));
+registerLookup("bill-account", {
+  search: (q) => searchAccounts(q),
+  sub: (r) => ACCOUNT_TYPE_LABELS[r.account_type] ?? "",
+  isChosen: (input) => lineEdit(input)?.account?.display_name === input.value,
+  choose: (input, item) => {
+    lineEdit(input).account = item;
+    input.value = item.display_name;
+  },
+});
 let last = { sub: "", query: new URLSearchParams() };
 
 export const leave = () => {
@@ -98,10 +112,11 @@ async function renderList(query) {
 async function renderForm(id) {
   closeLookup();
   app.innerHTML = '<p class="text-sm text-gray-500">Memuat...</p>';
+  const profiles = await referenceAssetProfiles(); // null bila modul aset tidak terpasang
   const bill = await readOne("account.move", id, [
     "name", "state", "payment_state", "move_type", "partner_id", "ref", "invoice_date", "date", "invoice_date_due", "invoice_payment_term_id",
     "journal_id", "currency_id", "invoice_origin", "amount_untaxed", "amount_tax", "amount_total", "amount_residual", "matched_payment_ids",
-    "show_reset_to_draft_button",
+    "show_reset_to_draft_button", ...(profiles ? ["asset_count"] : []),
   ]);
   if (!bill) {
     app.innerHTML = '<p class="text-sm text-rose-600">Tagihan tidak ditemukan.</p>';
@@ -110,9 +125,10 @@ async function renderForm(id) {
   const lines = await searchRead(
     "account.move.line",
     [["move_id", "=", id], ["display_type", "=", "product"]],
-    ["product_id", "name", "account_id", "quantity", "product_uom_id", "price_unit", "tax_ids", "price_subtotal"],
+    ["product_id", "name", "account_id", "quantity", "product_uom_id", "price_unit", "tax_ids", "price_subtotal", ...(profiles ? ["asset_profile_id"] : [])],
     { order: "sequence, id" },
   );
+  const items = await loadJournalItems(id);
   const taxIds = [...new Set(lines.flatMap((l) => l.tax_ids))];
   const taxes = taxIds.length ? await searchRead("account.tax", [["id", "in", taxIds]], ["display_name"]) : [];
   const taxName = new Map(taxes.map((t) => [t.id, t.display_name]));
@@ -123,7 +139,10 @@ async function renderForm(id) {
   const currency = bill.currency_id?.[1];
   if (editable && form?.id !== id) {
     const values = { ref: bill.ref || "", invoice_date: bill.invoice_date || "", date: bill.date || "", invoice_date_due: bill.invoice_date_due || "" };
-    form = { id, ...values, initial: { ...values } };
+    const edits = new Map(
+      lines.map((l) => [l.id, { account: l.account_id ? { id: l.account_id[0], display_name: l.account_id[1] } : null, profile: l.asset_profile_id?.[0] ?? null }]),
+    );
+    form = { id, ...values, initial: { ...values }, lines: edits, initialLines: new Map([...edits].map(([k, v]) => [k, { ...v }])) };
   }
   const dateInput = (key, label) => fieldBlock(label, `<input type="date" data-value="${key}" value="${esc(form[key])}" class="${INPUT}">`);
   const fields = editable
@@ -140,12 +159,21 @@ async function renderForm(id) {
        ${fieldBlock("Jatuh Tempo", readonlyValue(bill.invoice_date_due ? dateText(bill.invoice_date_due) : ""))}
        ${fieldBlock("Jurnal", readonlyValue(bill.journal_id?.[1]))}`;
 
+  const accountCell = (l) =>
+    editable
+      ? `<input data-lookup="bill-account" data-line="${l.id}" autocomplete="off" role="combobox" aria-autocomplete="list" value="${esc(form.lines.get(l.id)?.account?.display_name ?? "")}" placeholder="Cari akun..." class="${INPUT}" aria-label="Akun untuk ${esc(l.name)}">`
+      : esc(l.account_id?.[1]);
+  const profileCell = (l) =>
+    editable
+      ? `<select data-line-profile="${l.id}" class="${INPUT}" aria-label="Profil aset untuk ${esc(l.name)}">${selectOptions(profiles, form.lines.get(l.id)?.profile ?? null, "-")}</select>`
+      : esc(l.asset_profile_id?.[1] ?? "-");
   const rows = lines
     .map(
-      (l) => `<tr>
+      (l) => `<tr class="align-top">
         <td class="py-2 px-4 text-sm">${esc(l.product_id?.[1])}</td>
         <td class="py-2 px-4 text-sm">${esc(l.name)}</td>
-        <td class="py-2 px-4 text-sm">${esc(l.account_id?.[1])}</td>
+        <td class="py-2 px-4 text-sm min-w-56">${accountCell(l)}</td>
+        ${profiles ? `<td class="py-2 px-4 text-sm min-w-40">${profileCell(l)}</td>` : ""}
         <td class="py-2 px-4 text-sm text-right">${esc(l.quantity)}</td>
         <td class="py-2 px-4 text-sm">${esc(l.product_uom_id?.[1])}</td>
         <td class="py-2 px-4 text-sm text-right">${money(l.price_unit, currency)}</td>
@@ -154,6 +182,8 @@ async function renderForm(id) {
       </tr>`,
     )
     .join("");
+  const columns = ["Produk", "Label", "Akun", ...(profiles ? ["Profil Aset"] : []), "Jumlah", "Satuan", "Harga", "Pajak", "Subtotal"];
+  const rightAligned = columns.filter((c) => ["Jumlah", "Harga", "Subtotal"].includes(c));
   const saveBar = editable
     ? `<div class="flex gap-2 mt-4">
          <button data-action="save" data-id="${id}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Simpan</button>
@@ -168,6 +198,8 @@ async function renderForm(id) {
     <div class="flex flex-wrap gap-2 mb-4">${statTiles([
       { count: orders.length, label: `Purchase Order ${origins.join(", ")}`, icon: "fa-shopping-cart", href: orders.length === 1 ? `#/po/${orders[0].id}` : `#/po?ids=${orders.map((o) => o.id).join(",")}` },
       { count: bill.matched_payment_ids.length, label: "Pembayaran", icon: "fa-money-bill", href: `#/payment?ids=${bill.matched_payment_ids.join(",")}` },
+      { count: bill.asset_count ?? 0, label: "Aset", icon: "fa-building" },
+      { count: items.length, label: "Item Jurnal", icon: "fa-book", target: "journal-items" },
     ])}</div>
     <div class="mb-3"><div class="text-sm text-gray-500">Tagihan Vendor</div>
       <h1 class="text-2xl font-bold text-gray-900">${esc(bill.name || "Draft")}</h1>
@@ -175,8 +207,8 @@ async function renderForm(id) {
     <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 grid md:grid-cols-2 gap-x-8 gap-y-4">${fields}</section>
     <section class="bg-white rounded-xl shadow-sm border border-gray-200 mt-4 p-4 overflow-x-auto">
       <div class="text-sm font-semibold mb-3">Baris Tagihan</div>
-      <table class="w-full text-left"><thead class="bg-gray-50"><tr>${["Produk", "Label", "Akun", "Jumlah", "Satuan", "Harga", "Pajak", "Subtotal"]
-        .map((h, i) => `<th class="py-2 px-4 text-xs font-semibold text-gray-600 uppercase ${[3, 5, 7].includes(i) ? "text-right" : ""}">${h}</th>`).join("")}</tr></thead>
+      <table class="w-full text-left"><thead class="bg-gray-50"><tr>${columns
+        .map((h) => `<th class="py-2 px-4 text-xs font-semibold text-gray-600 uppercase ${rightAligned.includes(h) ? "text-right" : ""}">${h}</th>`).join("")}</tr></thead>
         <tbody class="divide-y divide-gray-100">${rows}</tbody></table>
       <div class="mt-4 ml-auto w-full max-w-xs text-sm space-y-1">
         <div class="flex justify-between"><span class="text-gray-500">Sebelum Pajak</span><span>${money(bill.amount_untaxed, currency)}</span></div>
@@ -186,6 +218,7 @@ async function renderForm(id) {
       </div>
       ${saveBar}
     </section>
+    ${journalHtml(items, currency, { journal: bill.journal_id?.[1], state: bill.state })}
     ${chatterHtml("account.move", id)}`;
   loadMessages("account.move", id);
 }
@@ -259,7 +292,18 @@ async function confirmPay(button) {
 
 /* Hanya field yang berubah yang dikirim: menulis ulang tanggal tagihan yang sama dapat memicu Odoo
  * menghitung ulang jatuh tempo dari syarat pembayaran. */
+async function persistLines() {
+  for (const [lineId, edit] of form.lines) {
+    const before = form.initialLines.get(lineId);
+    if (!edit.account) throw new Error("Pilih akun dari kotak saran untuk setiap baris.");
+    if (edit.account.id !== before.account?.id) await call("account.move.line", "write", { ids: [lineId], vals: { account_id: edit.account.id } });
+    // Profil aset dihitung dari akun; tulis hanya bila pengguna memilih profil yang berbeda dari isian awal.
+    if (edit.profile !== before.profile) await call("account.move.line", "write", { ids: [lineId], vals: { asset_profile_id: edit.profile || false } });
+  }
+}
+
 async function persist() {
+  await persistLines();
   const vals = {};
   for (const key of ["ref", "invoice_date", "date", "invoice_date_due"]) {
     if (form[key] !== form.initial[key]) vals[key] = form[key] || false;
@@ -307,9 +351,19 @@ export async function onClick(event, el) {
 
 export function onInput(event, el) {
   if (el.dataset.value && form) form[el.dataset.value] = el.value;
+  else if (el.dataset.lookup === "bill-account" && form) {
+    const edit = lineEdit(el);
+    if (edit) edit.account = null; // teks diubah: pilihan lama tidak berlaku sampai memilih dari kotak saran
+    runLookup(el, 250);
+  }
 }
 
 export async function onChange(event, el) {
+  if (el.dataset.lineProfile && form) {
+    const edit = form.lines.get(Number(el.dataset.lineProfile));
+    if (edit) edit.profile = el.value ? Number(el.value) : null;
+    return;
+  }
   // Mengganti jurnal mengubah metode pembayaran yang tersedia: simpan isian ke wizard lalu muat ulang dialog.
   if (el.dataset.pay === "journal_id" && pay) {
     const { id, context } = pay;

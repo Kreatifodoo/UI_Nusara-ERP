@@ -24,6 +24,13 @@ class TestCompanySetupIndonesia(TransactionCase):
             self.env["account.journal"].search_count([("company_id", "=", company.id)]),
             "Jurnal harus terbentuk dari COA l10n_id",
         )
+        # Persediaan: perpetual dengan biaya rata-rata untuk kategori Goods.
+        self.assertEqual(company.inventory_valuation, "real_time")
+        self.assertTrue(company.anglo_saxon_accounting)
+        goods = self.env.ref("product.product_category_goods").with_company(company)
+        self.assertEqual(goods.property_valuation, "real_time")
+        self.assertEqual(goods.property_cost_method, "average")
+        self.assertTrue(goods.property_stock_valuation_account_id)
 
     def test_setup_converts_default_pricelist_only(self):
         company = self.env["res.company"].create({"name": "PT Uji Price List"})
