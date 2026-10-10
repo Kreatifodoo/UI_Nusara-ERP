@@ -3,7 +3,7 @@
 //   onSubmit(event, form, kind, button), leave().
 import {
   OdooError, auth, closeLookup, closeModal, ctx, loadSession, modalOpen, postNote, renderConnect, renderSession,
-  searchRead, setReroute, toast, guarded,
+  resetReferences, searchRead, setReroute, toast, guarded,
 } from "./common.js";
 import {
   closeMobile, goFirstMatch, goLeaf, openMobile, renderSidebar, resolveActive, setSearch, setVersion, toggleBranch,
@@ -13,9 +13,12 @@ import * as po from "./pages/po.js";
 import * as receipt from "./pages/receipt.js";
 import * as bill from "./pages/bill.js";
 import * as payment from "./pages/payment.js";
+import * as vendor from "./pages/vendor.js";
+import * as pricelist from "./pages/pricelist.js";
+import * as product from "./pages/product.js";
 import * as soon from "./pages/soon.js";
 
-const PAGES = { pr, po, receipt, bill, payment, soon };
+const PAGES = { pr, po, receipt, bill, payment, vendor, pricelist, product, soon };
 let currentId = "pr";
 
 function parseHash() {
@@ -84,6 +87,18 @@ setReroute(route);
 
 const page = () => PAGES[currentId];
 
+/** Mengubah parameter daftar (state, q) sambil mempertahankan yang lain (mis. ids, partner). */
+function navigateWith(changes) {
+  const [path, queryText = ""] = location.hash.replace(/^#\/?/, "").split("?");
+  const params = new URLSearchParams(queryText);
+  for (const [key, value] of Object.entries(changes)) {
+    if (value) params.set(key, value);
+    else params.delete(key);
+  }
+  const qs = params.toString();
+  location.hash = `#/${path}${qs ? `?${qs}` : ""}`;
+}
+
 document.addEventListener("click", async (event) => {
   const el = event.target.closest("[data-action]");
   if (!el) return;
@@ -91,6 +106,7 @@ document.addEventListener("click", async (event) => {
   if (action === "disconnect") {
     auth.clear();
     ctx.user = null;
+    resetReferences();
     Object.values(PAGES).forEach((p) => p.leave?.());
     route();
   } else if (action === "goto") {
@@ -120,8 +136,8 @@ document.addEventListener("input", (event) => {
 
 document.addEventListener("change", (event) => {
   const el = event.target;
-  if (el.dataset.change === "filter") {
-    location.hash = el.value ? `#/${currentId}?state=${encodeURIComponent(el.value)}` : `#/${currentId}`;
+  if (el.dataset.change === "filter" || el.dataset.change === "search") {
+    navigateWith(el.dataset.change === "filter" ? { state: el.value } : { q: el.value.trim() });
     return;
   }
   page().onChange?.(event, el);

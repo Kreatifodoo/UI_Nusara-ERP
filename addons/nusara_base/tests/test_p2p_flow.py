@@ -152,3 +152,44 @@ class TestProcureToPay(AccountTestInvoicingCommon):
         self.assertEqual(payments.partner_id, self.vendor)
         self.assertEqual(payments.amount, bill.amount_total)
         self.assertIn(bill.payment_state, ("paid", "in_payment"))
+
+    def test_tiered_vendor_price_follows_line_quantity(self):
+        """Harga vendor bertingkat dipakai menurut kuantitas baris, apa pun jalur pembuatannya."""
+        self.env["product.supplierinfo"].create(
+            {
+                "partner_id": self.vendor.id,
+                "product_tmpl_id": self.material.product_tmpl_id.id,
+                "min_qty": 10.0,
+                "price": 80000.0,
+                "currency_id": self.company.currency_id.id,
+            }
+        )
+
+        def new_order_line(qty, **extra):
+            order = self.env["purchase.order"].create(
+                {
+                    "partner_id": self.vendor.id,
+                    "order_line": [
+                        Command.create(
+                            {
+                                "product_id": self.material.id,
+                                "product_qty": qty,
+                                "product_uom_id": self.material.uom_id.id,
+                                **extra,
+                            }
+                        )
+                    ],
+                }
+            )
+            return order.order_line
+
+        self.assertEqual(new_order_line(1.0).price_unit, 100000.0)
+        self.assertEqual(new_order_line(9.0).price_unit, 100000.0)
+        self.assertEqual(new_order_line(10.0).price_unit, 80000.0)
+        self.assertEqual(new_order_line(12.0).price_unit, 80000.0)
+        # Harga yang dikirim eksplisit tidak ditimpa.
+        self.assertEqual(new_order_line(12.0, price_unit=90000.0).price_unit, 90000.0)
+        # Menulis ulang kuantitas tetap memperbarui harga.
+        line = new_order_line(1.0)
+        line.product_qty = 20.0
+        self.assertEqual(line.price_unit, 80000.0)

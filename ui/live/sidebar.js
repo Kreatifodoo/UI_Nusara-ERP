@@ -66,15 +66,17 @@ export function resolveActive(pageId, sub, query) {
   if (pageId === "soon") return sub;
   const candidates = LEAVES.filter((l) => l.mod === pageId);
   if (!candidates.length) return null;
+  // Beberapa menu bisa menuju halaman yang sama (mis. Product Master di tiap modul): prioritaskan yang cocok
+  // dengan filter di URL, lalu menu yang baru diklik, lalu menu aktif sebelumnya.
   const state = query.get("state");
-  const byState = state && candidates.find((c) => c.route.includes(`state=${state}`));
-  const clicked = clickedKey && candidates.find((c) => c.key === clickedKey);
+  const byState = state ? candidates.filter((c) => c.route.includes(`state=${state}`)) : [];
+  const pool = byState.length ? byState : candidates;
+  const clicked = clickedKey && pool.find((c) => c.key === clickedKey);
   clickedKey = null;
-  if (byState) return byState.key;
   if (clicked) return clicked.key;
-  const previous = lastActive && candidates.find((c) => c.key === lastActive);
+  const previous = lastActive && pool.find((c) => c.key === lastActive);
   if (previous) return previous.key;
-  return (candidates.find((c) => c.route === pageId) ?? candidates[0]).key;
+  return (pool.find((c) => c.route === pageId) ?? pool[0]).key;
 }
 
 export function renderSidebar(key) {

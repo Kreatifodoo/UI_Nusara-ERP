@@ -6,7 +6,7 @@ export const MENU = [
     title: "Purchase Request", icon: "fas fa-file-signature",
     items: [
       { title: "Dashboard" },
-      { title: "Master", items: [{ title: "Product Master", odoo: "product.template" }] },
+      { title: "Master", items: [{ title: "Product Master", route: "product?state=purchase" }] },
       { title: "Purchase Request", route: "pr" },
       { title: "Report", items: [{ title: "Purchase Request Line", odoo: "purchase.request.line" }, { title: "Purchase Request Analisis", odoo: "purchase.request.line" }] },
       { title: "Setting" },
@@ -16,7 +16,7 @@ export const MENU = [
     title: "Purchase", icon: "fas fa-shopping-cart",
     items: [
       { title: "Dashboard" },
-      { title: "Master", items: [{ title: "Vendor Master", odoo: "res.partner" }, { title: "Vendor Price list", odoo: "product.supplierinfo" }, { title: "Product Master", odoo: "product.template" }] },
+      { title: "Master", items: [{ title: "Vendor Master", route: "vendor" }, { title: "Vendor Price list", route: "pricelist" }, { title: "Product Master", route: "product?state=purchase" }] },
       { title: "Request for Quotation", route: "po?state=rfq" },
       { title: "Purchase Order", route: "po?state=purchase" },
       { title: "Create Vendor Bill", route: "bill?state=draft" },
@@ -31,7 +31,7 @@ export const MENU = [
       {
         title: "Master",
         items: [
-          { title: "Product Master", odoo: "product.template" }, { title: "Product Category", odoo: "product.category" },
+          { title: "Product Master", route: "product?state=all" }, { title: "Product Category", odoo: "product.category" },
           { title: "Reorder Level", odoo: "stock.warehouse.orderpoint" }, { title: "Put away Rules", odoo: "stock.putaway.rule" },
           { title: "Unit of Measurement Master", odoo: "uom.uom" }, { title: "Lot & Serial Number Master", odoo: "stock.lot" },
           { title: "Warehouse & Location Master", odoo: "stock.warehouse" },
@@ -94,7 +94,7 @@ export const MENU = [
       { title: "Dashboard" },
       {
         title: "Master",
-        items: [{ title: "Product Master", odoo: "product.template" }, { title: "Customers Master", odoo: "res.partner" }, { title: "Promotion & Loyalty", odoo: "loyalty.program" }, { title: "Pricelis Master", odoo: "product.pricelist" }],
+        items: [{ title: "Product Master", route: "product?state=sale" }, { title: "Customers Master", odoo: "res.partner" }, { title: "Promotion & Loyalty", odoo: "loyalty.program" }, { title: "Pricelis Master", odoo: "product.pricelist" }],
       },
       { title: "Quotations", odoo: "sale.order" },
       { title: "Sales Orders", odoo: "sale.order" },
@@ -113,8 +113,8 @@ export const MENU = [
       {
         title: "Master",
         items: [
-          { title: "Chart of Account", odoo: "account.account" }, { title: "Customer Master", odoo: "res.partner" }, { title: "Vendor Master", odoo: "res.partner" },
-          { title: "Product Master", odoo: "product.template" }, { title: "Product Category", odoo: "product.category" }, { title: "Tax Master", odoo: "account.tax" },
+          { title: "Chart of Account", odoo: "account.account" }, { title: "Customer Master", odoo: "res.partner" }, { title: "Vendor Master", route: "vendor" },
+          { title: "Product Master", route: "product?state=all" }, { title: "Product Category", odoo: "product.category" }, { title: "Tax Master", odoo: "account.tax" },
           { title: "Currencies", odoo: "res.currency" }, { title: "Jurnal", odoo: "account.journal" }, { title: "Asset Model", odoo: "account.asset" },
           { title: "Budget Plan Master", odoo: "account.budget" }, { title: "Analitic Account", odoo: "account.analytic.account" },
         ],
