@@ -40,8 +40,8 @@ oca.lock                      # repo OCA 19.0 yang dipakai, dikunci ke commit
 docker/, docker-compose.yml   # image Odoo 19 + OCA dan lingkungan lokal
 config/odoo.conf              # konfigurasi Odoo
 deploy/                       # compose dan skrip update untuk server
-ui/                           # UI Nusara terhubung ke Odoo (nginx + halaman Purchase Request)
-scripts/                      # fetch-oca.sh (modul OCA) dan seed_demo.py (data contoh)
+ui/                           # UI Nusara terhubung ke Odoo (nginx, sidebar, halaman P2P)
+scripts/                      # fetch-oca.sh, seed_demo.py, check_p2p_api.py (uji regresi)
 .github/workflows/            # CI (lint + test) dan CD (image + deploy)
 docs/                         # peta modul, keputusan, dan CI/CD
 ```
@@ -82,9 +82,19 @@ Menjalankan test modul `nusara_base` (di database terpisah, tidak menyentuh data
 docker compose run --rm --no-deps odoo odoo -d nusara_test -i nusara_base --test-enable --test-tags /nusara_base --without-demo=true --stop-after-init
 ```
 
-## UI Nusara yang terhubung ke Odoo (uji kelayakan)
+## UI Nusara yang terhubung ke Odoo
 
-Halaman **Purchase Request** di `ui/live/` bertransaksi langsung ke Odoo lewat API JSON-2, dengan form yang mengikuti form Odoo (tombol menurut status dan hak manager, bilah status, tombol statistik, tabel barang, chatter). Alurnya: buat PR → ajukan → setujui → buat RFQ → konfirmasi PO. Hanya untuk pengembangan lokal (HTTP, hanya `127.0.0.1`).
+Kerangka di `ui/live/` memakai **desain sidebar prototipe** (9 modul, menu bertingkat, pencarian menu) dan bertransaksi langsung ke Odoo lewat API JSON-2. Menu yang bertitik hijau sudah terhubung; sisanya membuka halaman "belum terhubung ke Odoo" yang menyebut model Odoo tujuannya (bukan data palsu).
+
+| Menu | Halaman | Model Odoo |
+|---|---|---|
+| Purchase Request › Purchase Request | Daftar dan form PR | `purchase.request` (OCA) |
+| Purchase › Request for Quotation, Purchase Order | RFQ dan PO | `purchase.order` |
+| Purchase › Create Vendor Bill, Accounting › Vendors › Vendor Bills | Tagihan vendor, dialog Bayar | `account.move`, `account.payment.register` |
+| Inventory › Operation › Good Receive | Penerimaan barang, backorder | `stock.picking` |
+| Accounting › Vendors › Vendor Payment | Pembayaran | `account.payment` |
+
+Alur yang bisa dijalankan penuh dari UI: **Purchase Request → RFQ → PO → penerimaan (termasuk sebagian dengan backorder) → tagihan vendor → pembayaran (termasuk bayar sebagian)**. Form mengikuti view Odoo: tombol header menurut status dan hak, bilah status, tombol statistik, field yang hanya bisa diedit saat draft, tabel barang, total, dan chatter. Hanya untuk pengembangan lokal (HTTP, hanya `127.0.0.1`).
 
 1. Jalankan tumpukan (layanan `ui` ikut menyala di http://localhost:8080):
 
@@ -102,6 +112,14 @@ docker compose run --rm -T odoo odoo shell -d nusara --no-http < scripts/seed_de
 4. Buka http://localhost:8080, tempel API key, lalu **Hubungkan**. Key disimpan di `sessionStorage` tab itu saja dan hilang saat tab ditutup.
 
 Nginx pada layanan `ui` hanya meneruskan `/json/2/` ke Odoo, sehingga antarmuka admin Odoo tidak terbuka lewat port itu dan CORS tidak diperlukan.
+
+### Uji regresi alur Procure-to-Pay
+
+`scripts/check_p2p_api.py` menjalankan seluruh alur di atas lewat API (panggilan yang sama dengan UI) dan memeriksa 21 hal, termasuk penerimaan sebagian dengan backorder dan pembayaran bertahap. Skrip ini **menulis data**, jadi pakai database uji dan API key pengguna uji:
+
+```bash
+NUSARA_API_KEY=<api-key-uji> python3 scripts/check_p2p_api.py --yes --url http://127.0.0.1:8080
+```
 
 Detail CI/CD dan penyiapan server ada di [docs/CICD.md](docs/CICD.md).
 
