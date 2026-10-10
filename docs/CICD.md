@@ -15,7 +15,7 @@ PR / push ke main ──► CI  (lint pre-commit + build image + test Odoo)
 
 ## Modul OCA
 
-Daftar repo OCA dan commit-nya ada di `oca.lock`. Memperbarui satu repo: ambil SHA terbaru cabang 19.0, ganti di `oca.lock`, buka pull request. CI akan membangun ulang dan menguji. Jika repo baru ditambahkan, tambahkan juga path-nya di `addons_path` pada `config/odoo.conf`.
+Daftar repo OCA dan commit-nya ada di `oca.lock`. Memperbarui satu repo: ambil SHA terbaru cabang 19.0, ganti di `oca.lock`, buka pull request. CI akan membangun ulang dan menguji. Jika repo baru ditambahkan, tambahkan juga path-nya di `addons_path` pada `config/odoo.conf`. Repo yang dipakai saat ini: purchase-workflow, account-financial-tools, account-financial-reporting, mis-builder, account-budgeting, server-tools, account-reconcile, server-ux, reporting-engine, web.
 
 Dependensi Python OCA **tidak** dipasang otomatis. Beberapa repo OCA mencantumkan paket berat atau terkunci versinya untuk modul yang tidak kita pakai (mis. `bokeh`, `sentry_sdk`). Jika sebuah modul yang kita pasang butuh paket tambahan, tambahkan hanya paket itu ke `docker/requirements.txt`.
 
@@ -60,4 +60,4 @@ Untuk produksi nanti: environment `production` dengan "Required reviewers", agar
 
 ## Yang belum teruji
 
-Kerangka ini ditulis tanpa Docker di mesin pengembangan, jadi belum pernah dijalankan end-to-end. Pengujian pertamanya adalah CI di pull request pertama. Yang sudah diuji secara lokal: `scripts/fetch-oca.sh` mengambil kedelapan repo OCA pada commit terkunci dan aman dijalankan ulang; sintaks shell, Python, dan YAML valid. Yang belum teruji: build image, instalasi modul di Odoo 19 (termasuk `l10n_id`), dan test. Hal yang paling mungkin perlu penyesuaian: nama modul di `depends` pada `addons/nusara_base/__manifest__.py`, dan format log test Odoo yang diperiksa pada langkah "Jalankan test Odoo".
+Kerangka ini ditulis tanpa Docker di mesin pengembangan, jadi belum pernah dijalankan end-to-end. Pengujian pertamanya adalah CI di pull request pertama. Yang sudah diuji secara lokal: `scripts/fetch-oca.sh` mengambil semua repo OCA pada commit terkunci dan aman dijalankan ulang; sintaks shell, Python, dan YAML valid. Yang belum teruji: build image, instalasi modul di Odoo 19 (termasuk `l10n_id`), dan test. Hal yang paling mungkin perlu penyesuaian: nama modul di `depends` pada `addons/nusara_base/__manifest__.py`, dan format log test Odoo yang diperiksa pada langkah "Jalankan test Odoo".
