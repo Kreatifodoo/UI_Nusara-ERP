@@ -72,7 +72,7 @@ def main():
         sys.exit("Isi NUSARA_API_KEY dan tambahkan --yes. Skrip ini menulis data; pakai database uji.")
     api = Api(args.url, key)
 
-    product = (api.search("product.product", [["name", "=", "Bahan Baku Nusara"]], ["uom_id"], limit=1) or [None])[0]
+    product = (api.search("product.product", [["name", "=", "Bahan Baku Nusara"]], ["uom_id", "categ_id"], limit=1) or [None])[0]
     vendor = (api.search("res.partner", [["name", "=", "PT Pemasok Nusantara"]], ["id"], limit=1) or [None])[0]
     if not product or not vendor:
         sys.exit("Data contoh belum ada. Jalankan scripts/seed_demo.py dulu.")
@@ -145,6 +145,17 @@ def main():
     bill = api.read("account.move", bill_id, ["state", "payment_state", "amount_residual", "amount_total"])
     check(bill["state"] == "posted" and bill["payment_state"] == "not_paid", "tagihan terposting, belum dibayar")
 
+    step("Jurnal tagihan vendor")
+    items = api.search("account.move.line", [["move_id", "=", bill_id]], ["account_id", "debit", "credit"])
+    check(abs(sum(i["debit"] for i in items) - sum(i["credit"] for i in items)) < 0.005, "jurnal tagihan seimbang")
+    payable = [i for i in items if i["credit"]]
+    check(len(payable) == 1 and payable[0]["credit"] == bill["amount_total"], "hutang usaha dikredit sebesar total tagihan")
+    category = api.read("product.category", product["categ_id"][0], ["property_valuation", "property_stock_valuation_account_id"]) if product["categ_id"] else None
+    check(category is not None, "produk contoh punya kategori (tanpa kategori barang stok tidak masuk Persediaan)")
+    if category and category["property_valuation"] == "real_time":
+        stock_account = category["property_stock_valuation_account_id"][0]
+        check(any(i["account_id"][0] == stock_account and i["debit"] == 1_000_000.0 for i in items), "valuasi perpetual: tagihan mendebit akun Persediaan, bukan beban")
+
     step("Pembayaran sebagian lalu pelunasan lewat wizard Register Payment")
     pay_context = {"active_model": "account.move", "active_ids": [bill_id]}
 
@@ -160,6 +171,16 @@ def main():
     bill = api.read("account.move", bill_id, ["payment_state", "amount_residual", "matched_payment_ids"])
     check(bill["payment_state"] == "paid" and bill["amount_residual"] == 0.0, "lunas: status paid, sisa 0")
     check(len(bill["matched_payment_ids"]) == 2, "dua pembayaran terkait tagihan")
+    for payment_id in bill["matched_payment_ids"]:
+        payment = api.read("account.payment", payment_id, ["amount", "move_id", "destination_account_id", "outstanding_account_id"])
+        entry = api.search("account.move.line", [["move_id", "=", payment["move_id"][0]]], ["account_id", "debit", "credit"])
+        debit = [e for e in entry if e["debit"]]
+        credit = [e for e in entry if e["credit"]]
+        check(
+            len(debit) == 1 and debit[0]["account_id"][0] == payment["destination_account_id"][0] and debit[0]["debit"] == payment["amount"]
+            and len(credit) == 1 and credit[0]["account_id"][0] == payment["outstanding_account_id"][0],
+            f"jurnal pembayaran {payment['amount']:,.0f}: debit hutang usaha, kredit akun pembayaran tertunda",
+        )
 
     check_master_data(api)
 

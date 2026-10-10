@@ -74,3 +74,22 @@ Format: satu entri per keputusan. Status: **Diputuskan**, **Terbuka**, atau **Pe
 - **Dependensi baru**: repo OCA `server-ux` (`date_range`) dan `reporting-engine` (`report_xlsx`, `report_xlsx_helper`) ditambahkan ke `oca.lock` dan `addons_path`. Paket Python `xlsxwriter` dan `xlrd` sudah ada di image Odoo.
 - **Menu Nusara**: Accounting › Reporting (Trial Balance, General Ledger, Partner Ledger, Aged Receivable/Payable, Tax Report) → `account_financial_report`; Balance Sheet, Profit and Loss, Cash Flow Statement, Executive Summary → template `mis_builder` yang masih harus disusun sesuai COA `l10n_id`; Asset → `account_asset_management`; Bank Transaction → `account_reconcile_oca`. Halaman UI-nya belum dibangun.
 - **Database yang sudah ada**: modul baru ikut terpasang lewat `odoo -d <db> -u nusara_base --stop-after-init` setelah image dibangun ulang.
+
+## D13. Selaras dengan modul akuntansi: jurnal per tahap transaksi dan valuasi persediaan
+- **Status**: Diputuskan (2026-10-10), hasil audit setelah modul OCA D12 terpasang
+- **Jurnal yang tercipta** (dicatat dari alur nyata, `scripts/check_p2p_api.py` dan `test_p2p_flow.py`):
+
+| Tahap | Jurnal |
+|---|---|
+| Purchase Request, RFQ, konfirmasi PO | tidak ada |
+| Penerimaan barang | tidak ada. Odoo 19 hanya mencatat nilai pada `stock.move.value`; valuasi persediaan dijurnal saat tagihan |
+| Tagihan vendor diposting | Perpetual: Dr Persediaan, Dr PPN Masukan, Cr Hutang Usaha. Periodik (bawaan Odoo): Dr COGS/Beban, bukan Persediaan |
+| Pembayaran | Dr Hutang Usaha, Cr Akun Pembayaran Tertunda (bukan Bank) sampai dicocokkan dengan mutasi bank |
+| Tagihan dengan profil aset | aset terbentuk saat posting; jurnal penyusutan menyusul sesuai jadwal |
+
+- **Temuan utama**: bawaan Odoo 19 adalah valuasi periodik dengan harga standar. Barang stok yang ditagih langsung masuk beban (COGS) dan produk tanpa kategori tidak pernah masuk Persediaan. Untuk Indonesia (PSAK 14) dipakai **perpetual dengan biaya rata-rata** untuk kategori Goods: `res.company.nusara_setup_inventory_valuation()` (dipanggil juga oleh `nusara_setup_indonesia`). Jurnal lama tidak diubah. Services dan Expenses tidak diubah.
+- **Pembayaran tertunda**: tanpa rekonsiliasi bank, saldo pembayaran tetap di akun Pembayaran Tertunda. UI menampilkan peringatan; halaman Bank Transaction (`account_reconcile_oca`) belum dibangun.
+- **Field baru dari modul OCA yang kini dipakai UI**: `account.move.line.asset_profile_id` dan `asset_count` (aset dari tagihan), `account.account.asset_profile_id`, pengaturan `anglo_saxon_accounting`. Modul lain (`account_financial_report`, `mis_builder`, `account_reconcile_oca`) tidak mengubah alur Procure-to-Pay.
+- **Penyelarasan UI**: item jurnal pada tagihan dan pembayaran (draft tampil sebagai pratinjau), akun dan profil aset per baris tagihan (edit saat draft), akun hutang dan posisi fiskal di Vendor Master, akun beban/pendapatan dan kategori di Product Master (kategori bawaan Goods atau Services, barang baru dilacak stoknya, ringkasan akun yang didebit), halaman Product Category (metode biaya, valuasi, akun persediaan), halaman Jurnal Entry baca-saja yang menunjuk ke dokumen sumber, dan nilai persediaan pada penerimaan.
+- **Kebijakan kontrol tagihan**: produk jasa memakai "kuantitas yang dipesan" (bawaan Odoo). Dengan "diterima", tagihan jasa bernilai nol karena jasa tidak punya penerimaan; UI kini mengisi kebijakan menurut tipe produk.
+- **Belum**: laporan keuangan di UI dan template MIS Builder sesuai COA, halaman Bank Transaction dan rekonsiliasi, pajak pemotongan (PPh 23/4(2)) yang tidak dibawa `l10n_id`, anggaran, halaman Chart of Account, Tax, dan Journal master.

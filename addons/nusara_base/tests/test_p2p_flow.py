@@ -193,3 +193,108 @@ class TestProcureToPay(AccountTestInvoicingCommon):
         line = new_order_line(1.0)
         line.product_qty = 20.0
         self.assertEqual(line.price_unit, 80000.0)
+
+    def _purchase_to_bill(self, qty=10.0):
+        """PO -> penerimaan penuh -> tagihan diposting; mengembalikan (order, receipt, bill)."""
+        order = self.env["purchase.order"].create(
+            {
+                "partner_id": self.vendor.id,
+                "order_line": [
+                    Command.create(
+                        {
+                            "product_id": self.material.id,
+                            "product_qty": qty,
+                            "product_uom_id": self.material.uom_id.id,
+                        }
+                    )
+                ],
+            }
+        )
+        moves_before = self.env["account.move"].search_count([])
+        order.button_confirm()
+        self.assertEqual(
+            self.env["account.move"].search_count([]),
+            moves_before,
+            "Konfirmasi PO tidak boleh membuat jurnal",
+        )
+        receipt = order.picking_ids
+        receipt.move_ids.quantity = qty
+        receipt.move_ids.picked = True
+        receipt.button_validate()
+        self.assertEqual(receipt.state, "done")
+        self.assertEqual(
+            self.env["account.move"].search_count([]),
+            moves_before,
+            "Odoo 19 tidak membuat jurnal saat barang diterima; jurnal muncul saat tagihan",
+        )
+        order.action_create_invoice()
+        bill = order.invoice_ids
+        bill.invoice_date = fields.Date.today()
+        bill.action_post()
+        return order, receipt, bill
+
+    def _debits(self, move):
+        """Debit per akun pada sebuah jurnal, dikumpulkan menurut kode akun."""
+        result = {}
+        for line in move.line_ids:
+            result[line.account_id] = result.get(line.account_id, 0.0) + line.debit
+        return result
+
+    def test_bill_debits_inventory_under_perpetual_valuation(self):
+        """Setup Nusara: barang stok masuk ke akun Persediaan, bukan langsung ke beban."""
+        self.company.nusara_setup_inventory_valuation()
+        goods = self.env.ref("product.product_category_goods").with_company(self.company)
+        self.assertEqual(goods.property_valuation, "real_time")
+        self.assertEqual(goods.property_cost_method, "average")
+        self.material.categ_id = goods
+        stock_account = goods.property_stock_valuation_account_id
+        self.assertTrue(stock_account)
+
+        order, receipt, bill = self._purchase_to_bill()
+        # Nilai persediaan tercatat pada pergerakan stok walau jurnal baru dibuat saat tagihan.
+        self.assertEqual(sum(receipt.move_ids.mapped("value")), 1000000.0)
+        debits = self._debits(bill)
+        self.assertEqual(debits.get(stock_account), 1000000.0)
+        # Selain Persediaan hanya pajak masukan yang didebit: tidak ada beban (COGS).
+        self.assertEqual(sum(debits.values()), bill.amount_total)
+        self.assertEqual(sum(1 for amount in debits.values() if amount), 2)
+        payable = bill.line_ids.filtered(
+            lambda line: line.account_id.account_type == "liability_payable"
+        )
+        self.assertEqual(payable.credit, bill.amount_total)
+        self.assertEqual(
+            sum(bill.line_ids.mapped("debit")), sum(bill.line_ids.mapped("credit"))
+        )
+
+        # Pembayaran: debit hutang usaha, kredit akun pembayaran tertunda (Outstanding Payments)
+        payment = (
+            self.env["account.payment.register"]
+            .with_context(active_model="account.move", active_ids=bill.ids)
+            .create({"payment_date": fields.Date.today()})
+            ._create_payments()
+        )
+        self.assertEqual(payment.destination_account_id, payable.account_id)
+        entry = payment.move_id
+        self.assertEqual(sum(entry.line_ids.mapped("debit")), bill.amount_total)
+        self.assertEqual(
+            sum(entry.line_ids.mapped("debit")), sum(entry.line_ids.mapped("credit"))
+        )
+        self.assertEqual(self._debits(entry).get(payable.account_id), bill.amount_total)
+        self.assertEqual(
+            entry.line_ids.filtered("credit").account_id, payment.outstanding_account_id
+        )
+
+    def test_bill_debits_expense_under_periodic_valuation(self):
+        """Bawaan Odoo (periodik): tagihan barang stok langsung mendebit beban; alasan setup di atas."""
+        self.company.inventory_valuation = "periodic"
+        goods = self.env.ref("product.product_category_goods").with_company(self.company)
+        goods.property_valuation = "periodic"
+        self.material.categ_id = goods
+        _order, _receipt, bill = self._purchase_to_bill()
+        debits = self._debits(bill)
+        expense_account = self.material.product_tmpl_id.with_company(
+            self.company
+        )._get_product_accounts()["expense"]
+        self.assertTrue(expense_account)
+        self.assertEqual(debits.get(expense_account), 1000000.0)
+        self.assertFalse(debits.get(goods.property_stock_valuation_account_id))

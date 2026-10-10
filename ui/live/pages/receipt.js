@@ -3,7 +3,7 @@
 // dengan jumlah diterima yang bisa diedit; wizard backorder saat jumlah kurang dari permintaan.
 import {
   actionBar, app, badge, call, cell, chatterHtml, closeModal, dateTimeText, esc, fieldBlock, filterSelect, guarded, loadMessages,
-  openModal, pageHeader, readOne, readonlyValue, rowLink, searchRead, statTiles, statusbar, table, toast, INPUT,
+  openModal, money, pageHeader, readOne, readonlyValue, rowLink, searchRead, statTiles, statusbar, table, toast, INPUT,
 } from "../common.js";
 
 const STATES = {
@@ -87,11 +87,12 @@ async function renderForm(id) {
   moves = await searchRead(
     "stock.move",
     [["picking_id", "=", id]],
-    ["product_id", "description_picking", "product_uom_qty", "quantity", "product_uom", "picked", "state"],
+    ["product_id", "description_picking", "product_uom_qty", "quantity", "product_uom", "picked", "state", "value"],
     { order: "id" },
   );
   edits = new Map();
   const editable = !["done", "cancel"].includes(pk.state);
+  const valued = pk.state === "done" && moves.some((m) => m.value);
 
   const rows = moves
     .map(
@@ -103,6 +104,7 @@ async function renderForm(id) {
           ? `<input type="number" min="0" step="any" data-move="${m.id}" value="${esc(m.quantity)}" class="${INPUT} text-right" aria-label="Jumlah diterima untuk ${esc(m.product_id?.[1])}">`
           : esc(m.quantity)}</td>
         <td class="py-2 px-4 text-sm">${esc(m.product_uom?.[1])}</td>
+        ${valued ? `<td class="py-2 px-4 text-sm text-right">${money(m.value)}</td>` : ""}
       </tr>`,
     )
     .join("");
@@ -130,10 +132,13 @@ async function renderForm(id) {
     </section>
     <section class="bg-white rounded-xl shadow-sm border border-gray-200 mt-4 overflow-x-auto">
       <div class="px-4 py-3 border-b border-gray-200 text-sm font-semibold">Operasi</div>
-      <table class="w-full text-left"><thead class="bg-gray-50"><tr>${["Produk", "Deskripsi", "Permintaan", "Jumlah Diterima", "Satuan"]
-        .map((h, i) => `<th class="py-2 px-4 text-xs font-semibold text-gray-600 uppercase ${i === 2 || i === 3 ? "text-right" : ""}">${h}</th>`).join("")}</tr></thead>
+      <table class="w-full text-left"><thead class="bg-gray-50"><tr>${[...["Produk", "Deskripsi", "Permintaan", "Jumlah Diterima", "Satuan"], ...(valued ? ["Nilai Persediaan"] : [])]
+        .map((h, i) => `<th class="py-2 px-4 text-xs font-semibold text-gray-600 uppercase ${i === 2 || i === 3 || i === 5 ? "text-right" : ""}">${h}</th>`).join("")}</tr></thead>
         <tbody class="divide-y divide-gray-100">${rows}</tbody></table>
     </section>
+    ${valued
+      ? `<p class="mt-3 text-sm text-sky-900 bg-sky-50 border border-sky-200 rounded-lg px-4 py-3">Nilai persediaan sudah tercatat pada pergerakan stok. Odoo tidak membuat jurnal saat barang diterima; jurnal persediaan atau biaya tercipta saat tagihan vendor diposting${pk.purchase_id ? ` (<a href="#/po/${pk.purchase_id[0]}" class="underline">${esc(pk.purchase_id[1])}</a>)` : ""}.</p>`
+      : ""}
     ${chatterHtml("stock.picking", pk.id)}`;
   loadMessages("stock.picking", pk.id);
 }

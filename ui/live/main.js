@@ -16,9 +16,11 @@ import * as payment from "./pages/payment.js";
 import * as vendor from "./pages/vendor.js";
 import * as pricelist from "./pages/pricelist.js";
 import * as product from "./pages/product.js";
+import * as category from "./pages/category.js";
+import * as journal from "./pages/journal.js";
 import * as soon from "./pages/soon.js";
 
-const PAGES = { pr, po, receipt, bill, payment, vendor, pricelist, product, soon };
+const PAGES = { pr, po, receipt, bill, payment, vendor, pricelist, product, category, journal, soon };
 let currentId = "pr";
 
 function parseHash() {

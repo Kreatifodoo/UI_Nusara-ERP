@@ -2,8 +2,8 @@
 // Reset to Draft, Cancel dengan syarat tampil yang sama; bilah status draft/in_process/paid; dan
 // tombol statistik ke tagihan yang dilunasi.
 import {
-  actionBar, app, badge, call, cell, chatterHtml, dateText, esc, fieldBlock, filterSelect, guarded, loadMessages, money, pageHeader,
-  readOne, readonlyValue, rowLink, searchRead, statTiles, statusbar, table, toast,
+  actionBar, app, badge, call, cell, chatterHtml, dateText, esc, fieldBlock, filterSelect, guarded, journalHtml, loadJournalItems, loadMessages,
+  money, pageHeader, readOne, readonlyValue, rowLink, searchRead, statTiles, statusbar, table, toast,
 } from "../common.js";
 
 const STATES = {
@@ -87,13 +87,16 @@ async function renderForm(id) {
   app.innerHTML = '<p class="text-sm text-gray-500">Memuat...</p>';
   const pay = await readOne("account.payment", id, [
     "name", "state", "payment_type", "partner_id", "amount", "currency_id", "date", "memo", "journal_id", "payment_method_line_id",
-    "partner_bank_id", "is_sent", "move_id", "reconciled_bill_ids", "reconciled_bills_count",
+    "partner_bank_id", "is_sent", "move_id", "reconciled_bill_ids", "reconciled_bills_count", "outstanding_account_id", "destination_account_id",
+    "is_matched",
   ]);
   if (!pay) {
     app.innerHTML = '<p class="text-sm text-rose-600">Pembayaran tidak ditemukan.</p>';
     return;
   }
   const currency = pay.currency_id?.[1];
+  const items = await loadJournalItems(pay.move_id?.[0]);
+  const unmatched = ["in_process", "paid"].includes(pay.state) && pay.move_id && !pay.is_matched;
   app.innerHTML = `
     <div class="text-sm text-gray-500 mb-2"><a href="#/payment" class="hover:text-indigo-600">Pembayaran</a> / ${esc(pay.name || "Draft")}</div>
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-3">
@@ -102,6 +105,7 @@ async function renderForm(id) {
     </div>
     <div class="flex flex-wrap gap-2 mb-4">${statTiles([
       { count: pay.reconciled_bills_count, label: "Tagihan Vendor", icon: "fa-file-invoice", href: `#/bill?ids=${pay.reconciled_bill_ids.join(",")}` },
+      { count: items.length, label: "Item Jurnal", icon: "fa-book", target: "journal-items" },
     ])}</div>
     <h1 class="text-2xl font-bold text-gray-900 mb-3">${esc(pay.name || "Draft")}</h1>
     <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 grid md:grid-cols-2 gap-x-8 gap-y-4">
@@ -113,7 +117,13 @@ async function renderForm(id) {
       ${fieldBlock("Jurnal", readonlyValue(pay.journal_id?.[1]))}
       ${fieldBlock("Metode Pembayaran", readonlyValue(pay.payment_method_line_id?.[1]))}
       ${fieldBlock("Rekening Bank Mitra", readonlyValue(pay.partner_bank_id?.[1]))}
+      ${fieldBlock(pay.payment_type === "outbound" ? "Akun Hutang" : "Akun Piutang", readonlyValue(pay.destination_account_id?.[1]))}
+      ${fieldBlock("Akun Pembayaran Tertunda", readonlyValue(pay.outstanding_account_id?.[1]))}
     </section>
+    ${unmatched
+      ? `<p class="mt-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">Pembayaran ini belum dicocokkan dengan mutasi bank. Sampai direkonsiliasi, nilainya tercatat di akun pembayaran tertunda, bukan di akun bank.</p>`
+      : ""}
+    ${journalHtml(items, currency, { journal: pay.journal_id?.[1] })}
     ${chatterHtml("account.payment", id)}`;
   loadMessages("account.payment", id);
 }

@@ -4,16 +4,20 @@
 import {
   INPUT, app, call, cell, changedValues, chatterHtml, checkboxField, ctx, esc, fieldBlock, fieldValue, filterSelect, guarded, loadMessages,
   pageHeader, readOne, referenceCountries, referenceCurrencies, referenceSelection, referenceTerms, referenceUsers, rowLink,
-  searchBox, searchRead, selectOptions, statTiles, table, toast, button,
+  referenceFiscalPositions, referencePayableAccounts, searchBox, searchRead, selectOptions, statTiles, table, toast, button,
 } from "../common.js";
 
 const FILTERS = [["vendor", "Pemasok"], ["all", "Semua kontak"], ["company", "Perusahaan"], ["archived", "Diarsipkan"]];
 const FIELDS = [
   "name", "is_company", "email", "phone", "website", "street", "street2", "city", "state_id", "zip", "country_id", "vat", "l10n_id_pkp",
   "l10n_id_kode_transaksi", "function", "ref", "buyer_id", "property_supplier_payment_term_id", "property_purchase_currency_id",
+  "property_account_payable_id", "property_account_position_id",
 ];
 const TEXT_KEYS = ["name", "email", "phone", "website", "street", "street2", "city", "zip", "vat", "function", "ref"];
-const ID_KEYS = ["state_id", "country_id", "buyer_id", "property_supplier_payment_term_id", "property_purchase_currency_id"];
+const ID_KEYS = [
+  "state_id", "country_id", "buyer_id", "property_supplier_payment_term_id", "property_purchase_currency_id", "property_account_payable_id",
+  "property_account_position_id",
+];
 
 let form = null; // { id, values, initial }
 const stateCache = new Map();
@@ -99,8 +103,9 @@ function field(key, label, _kind, inputHtml) {
 
 async function renderForm(id) {
   app.innerHTML = '<p class="text-sm text-gray-500">Memuat...</p>';
-  const [countries, currencies, terms, users, kodeOptions] = await Promise.all([
+  const [countries, currencies, terms, users, kodeOptions, payables, positions] = await Promise.all([
     referenceCountries(), referenceCurrencies(), referenceTerms(), referenceUsers(), referenceSelection("res.partner", "l10n_id_kode_transaksi"),
+    referencePayableAccounts(), referenceFiscalPositions(),
   ]);
   let partner = null;
   if (id) {
@@ -159,6 +164,9 @@ async function renderForm(id) {
       ${field("property_supplier_payment_term_id", "Syarat Pembayaran Vendor", "id", `<select data-value="property_supplier_payment_term_id" data-kind="id" class="${INPUT}">${selectOptions(terms, v.property_supplier_payment_term_id, "-")}</select>`)}
       ${field("property_purchase_currency_id", "Mata Uang Pemasok", "id", `<select data-value="property_purchase_currency_id" data-kind="id" class="${INPUT}">${selectOptions(currencies, v.property_purchase_currency_id, "-")}</select>`)}
       ${field("ref", "Referensi")}
+      <div class="md:col-span-2 border-t border-gray-100 pt-4 text-sm font-semibold text-gray-700">Akuntansi</div>
+      ${field("property_account_payable_id", "Akun Hutang", "id", `<select data-value="property_account_payable_id" data-kind="id" class="${INPUT}">${selectOptions(payables, v.property_account_payable_id, "Bawaan perusahaan")}</select>`)}
+      ${field("property_account_position_id", "Posisi Fiskal", "id", `<select data-value="property_account_position_id" data-kind="id" class="${INPUT}">${selectOptions(positions, v.property_account_position_id, "-")}</select>`)}
     </section>
     <div class="flex gap-2 mt-4">
       <button data-action="save" data-id="${partner?.id ?? ""}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Simpan</button>
