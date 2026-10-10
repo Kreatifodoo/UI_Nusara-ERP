@@ -260,6 +260,7 @@ export const referenceDefaultCategories = () =>
     const byName = Object.fromEntries(rows.map((r) => [r.name, r.res_id]));
     return { goods: byName.product_category_goods ?? null, services: byName.product_category_services ?? null };
   });
+export const referencePricelists = () => reference("pricelists", () => searchRead("product.pricelist", [], ["display_name"], { order: "name" }));
 export const referenceTaxes = (type) => reference(`taxes-${type}`, () => searchRead("account.tax", [["type_tax_use", "=", type]], ["display_name"], { order: "sequence, id" }));
 export const referenceSelection = (model, field) =>
   reference(`sel-${model}-${field}`, async () => {
@@ -305,9 +306,9 @@ modalRoot.className = "hidden fixed inset-0 z-40 bg-black/40 flex items-start ju
 document.body.append(modalRoot);
 
 let modalOnClose = null;
-export function openModal(title, bodyHtml, footerHtml, onClose = null) {
+export function openModal(title, bodyHtml, footerHtml, onClose = null, { wide = false } = {}) {
   modalOnClose = onClose;
-  modalRoot.innerHTML = `<div class="bg-white rounded-xl shadow-xl w-full max-w-lg mt-16" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+  modalRoot.innerHTML = `<div class="bg-white rounded-xl shadow-xl w-full ${wide ? "max-w-5xl" : "max-w-lg"} mt-16" role="dialog" aria-modal="true" aria-label="${esc(title)}">
     <div class="px-5 py-4 border-b border-gray-200 font-semibold text-gray-900">${esc(title)}</div>
     <div class="p-5 space-y-4" id="modal-body">${bodyHtml}</div>
     <div class="px-5 py-3 border-t border-gray-200 flex flex-wrap justify-end gap-2" id="modal-foot">${footerHtml}</div></div>`;
