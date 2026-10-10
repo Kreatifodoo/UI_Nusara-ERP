@@ -46,8 +46,14 @@ Format: satu entri per keputusan. Status: **Diputuskan**, **Terbuka**, atau **Pe
 - **`--without-demo`**: di Odoo 19 opsi ini boolean; gunakan `true`, bukan `all`.
 
 ## D9. UI Nusara terhubung ke Odoo lewat JSON-2 (uji kelayakan Purchase Request)
-- **Status**: Terbukti layak untuk satu alur (2026-10-09). Keputusan jalur A atau B tetap di akhir Fase 2.
+- **Status**: Terbukti layak untuk alur Procure-to-Pay penuh (2026-10-10). Keputusan jalur A atau B tetap di akhir Fase 2.
 - **Cara kerja**: halaman statis di `ui/live/` memanggil `POST /json/2/<model>/<metode>` pada alamat yang sama; nginx (`ui/nginx.conf.template`) hanya meneruskan `/json/2/`. Autentikasi bearer memakai API key pengguna sendiri. Rute JSON-2 Odoo 19 memakai `auth='bearer'` dan `save_session=False`, jadi tidak ada sesi cookie, dan CORS tidak aktif, sehingga proxy satu alamat diperlukan.
 - **Form mengikuti Odoo**: tombol header, status yang menampilkannya, hak manager (`res.users.has_group`), `is_editable` (field hanya bisa diedit saat draft), tombol statistik, kolom barang, default tanggal baris, dan chatter diambil dari definisi view Odoo/OCA, bukan dari tebakan. Untuk form lain, urutkan kerja: baca view XML dan `fields_get` modelnya, lalu petakan.
 - **Temuan saat uji**: tanggal baris wajib diisi (Odoo mengisinya otomatis di UI); label dan perilaku diselaraskan. API key tidak boleh ditaruh di berkas JavaScript; versi produksi perlu layar login dan penyimpanan kunci yang aman, atau BFF.
-- **Belum**: edit di status selain draft, pencarian dan filter lanjutan, pembagian hak per peran, mobile, dan 22 form lainnya. Memakai Tailwind dari CDN hanya untuk uji kelayakan.
+- **Cakupan**: Purchase Request, RFQ/PO, penerimaan barang (backorder), tagihan vendor (dialog pembayaran), dan pembayaran, di dalam kerangka sidebar prototipe (`ui/live/menu.js` menyalin struktur `menuData`; menu yang belum punya halaman menampilkan model Odoo tujuannya, bukan data palsu).
+- **Belum**: edit di status selain draft, Return penerimaan, Send RFQ lewat email, pembagian hak per peran, tampilan ponsel yang teruji, dan menu lainnya. Memakai Tailwind dari CDN hanya untuk uji kelayakan. Header prototipe memuat lonceng notifikasi dan avatar dari layanan luar; keduanya tidak dibawa karena datanya palsu dan avatar luar mengirim nama pengguna ke pihak ketiga.
+
+## D10. Harga manual baris PO dan teknik "kirim yang berubah saja"
+- **Status**: Diputuskan (2026-10-10), ditemukan lewat uji UI
+- **Temuan**: di Odoo 19, baris PO yang dibuat dengan `price_unit` eksplisit punya `technical_price_unit` yang sama dengan `price_unit`. Odoo menganggapnya "bukan manual" dan **menghitung ulang harganya dari daftar harga pemasok setiap kali header ditulis** (bahkan `partner_id` yang sama), sehingga harga manual hilang. Harga manual hanya bertahan bila baris dibuat tanpa harga (otomatis) lalu harganya ditulis **terpisah** pada baris itu.
+- **Konsekuensi**: `ui/live/pages/po.js` hanya mengirim field header dan baris yang berubah, dan menulis harga manual sebagai langkah kedua. Prinsip "kirim yang berubah saja" juga dipakai di form tagihan (menulis ulang `invoice_date` dapat menghitung ulang jatuh tempo). Dijaga oleh `scripts/check_p2p_api.py`.
