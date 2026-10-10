@@ -161,8 +161,69 @@ def main():
     check(bill["payment_state"] == "paid" and bill["amount_residual"] == 0.0, "lunas: status paid, sisa 0")
     check(len(bill["matched_payment_ids"]) == 2, "dua pembayaran terkait tagihan")
 
+    check_master_data(api)
+
     print("\n" + ("SEMUA LULUS" if not failures else f"{len(failures)} PEMERIKSAAN GAGAL"))
     sys.exit(1 if failures else 0)
+
+
+def check_master_data(api):
+    """Master data Purchase: vendor, produk, dan harga vendor yang menggerakkan harga RFQ."""
+    step("Master data: vendor, produk, dan harga vendor")
+    tag = datetime.datetime.now().strftime("%H%M%S")
+    [vendor_id] = api.call("res.partner", "create", vals_list=[{
+        "name": f"Vendor Regresi {tag}", "is_company": True, "supplier_rank": 1, "email": "regresi@example.com",
+    }])
+    check(bool(api.search("res.partner", [["supplier_rank", ">", 0], ["id", "=", vendor_id]], ["id"])), "vendor baru muncul di daftar pemasok")
+    api.call("res.partner", "write", ids=[vendor_id], vals={"phone": "021-555-0100"})
+    vendor = api.read("res.partner", vendor_id, ["email", "phone"])
+    check(vendor["phone"] == "021-555-0100" and vendor["email"] == "regresi@example.com", "ubah satu field, field lain utuh")
+    api.call("res.partner", "action_archive", ids=[vendor_id])
+    check(not api.search("res.partner", [["id", "=", vendor_id]], ["id"]), "vendor diarsipkan hilang dari daftar aktif")
+    check(bool(api.search("res.partner", [["id", "=", vendor_id]], ["id"], context={"active_test": False})), "vendor arsip tetap ada")
+    api.call("res.partner", "action_unarchive", ids=[vendor_id])
+    check(bool(api.search("res.partner", [["id", "=", vendor_id]], ["id"])), "vendor diaktifkan kembali")
+
+    defaults = api.call("product.template", "default_get", fields=["uom_id", "supplier_taxes_id"])
+    [tmpl_id] = api.call("product.template", "create", vals_list=[{
+        "name": f"Produk Regresi {tag}", "type": "consu", "purchase_ok": True, "sale_ok": True, "uom_id": defaults["uom_id"],
+        "list_price": 300_000.0, "standard_price": 200_000.0, "default_code": f"RG-{tag}",
+    }])
+    tmpl = api.read("product.template", tmpl_id, ["supplier_taxes_id", "product_variant_id", "seller_ids"])
+    check(bool(tmpl["supplier_taxes_id"]), "pajak pembelian bawaan perusahaan terpasang bila tidak dikirim")
+    api.call("product.template", "write", ids=[tmpl_id], vals={"supplier_taxes_id": [[6, 0, []]]})
+    check(api.read("product.template", tmpl_id, ["supplier_taxes_id"])["supplier_taxes_id"] == [], "pajak dikosongkan lewat perintah 6")
+    api.call("product.template", "write", ids=[tmpl_id], vals={"supplier_taxes_id": [[6, 0, tmpl["supplier_taxes_id"]]]})
+    variant_id = tmpl["product_variant_id"][0]
+    check(tmpl["seller_ids"] == [], "produk baru belum punya harga vendor")
+
+    idr = api.search("res.currency", [["name", "=", "IDR"]], ["id"])[0]["id"]
+
+    def rfq_price(qty):
+        order_id = api.call("purchase.order", "create", vals_list=[{
+            "partner_id": vendor_id,
+            "order_line": [[0, 0, {"product_id": variant_id, "product_qty": qty, "product_uom_id": defaults["uom_id"]}]],
+        }])[0]
+        return api.search("purchase.order.line", [["order_id", "=", order_id]], ["price_unit"])[0]["price_unit"]
+
+    [base_id] = api.call("product.supplierinfo", "create", vals_list=[{
+        "partner_id": vendor_id, "product_tmpl_id": tmpl_id, "min_qty": 1.0, "price": 250_000.0, "currency_id": idr, "delay": 3,
+    }])
+    check(rfq_price(1.0) == 250_000.0, "harga vendor baru otomatis terisi di baris RFQ")
+    api.call("product.supplierinfo", "create", vals_list=[{
+        "partner_id": vendor_id, "product_tmpl_id": tmpl_id, "min_qty": 10.0, "price": 200_000.0, "currency_id": idr, "delay": 3,
+    }])
+    check(rfq_price(12.0) == 200_000.0, "harga bertingkat: jumlah >= 10 memakai harga tier")
+    api.call("product.supplierinfo", "write", ids=[base_id], vals={"price": 230_000.0})
+    check(rfq_price(1.0) == 230_000.0, "perubahan harga vendor berlaku pada RFQ berikutnya")
+    check(len(api.read("product.template", tmpl_id, ["seller_ids"])["seller_ids"]) == 2, "produk menampilkan dua harga vendor")
+    api.call("product.supplierinfo", "unlink", ids=[base_id])
+    check(rfq_price(1.0) != 230_000.0, "harga vendor yang dihapus tidak dipakai lagi")
+
+    api.call("product.template", "action_archive", ids=[tmpl_id])
+    check(not api.search("product.template", [["id", "=", tmpl_id]], ["id"]), "produk diarsipkan hilang dari daftar aktif")
+    api.call("product.template", "action_unarchive", ids=[tmpl_id])
+    check(bool(api.search("product.template", [["id", "=", tmpl_id]], ["id"])), "produk diaktifkan kembali")
 
 
 def bill_total(api, bill_id):

@@ -141,6 +141,21 @@ export const rowLink = (href, cells) =>
 export const cell = (content, { right = false, strong = false, raw = false } = {}) =>
   `<td class="py-3 px-4 text-sm ${right ? "text-right" : ""} ${strong ? "font-medium text-indigo-700" : "text-gray-700"}">${raw ? content : esc(content)}</td>`;
 
+export const searchBox = (value, placeholder = "Cari...") =>
+  `<input data-change="search" value="${esc(value)}" placeholder="${esc(placeholder)}" aria-label="${esc(placeholder)}"
+    class="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white w-48 focus:outline-none focus:ring-2 focus:ring-indigo-500">`;
+export const checkboxField = (key, label, checked, extra = "") =>
+  `<label class="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" data-value="${esc(key)}" ${checked ? "checked" : ""} ${extra} class="rounded border-gray-300 text-indigo-600"> ${esc(label)}</label>`;
+/** Nilai field form menurut jenisnya: data-kind = id | bool | number, atau checkbox, atau teks. */
+export function fieldValue(el) {
+  if (el.type === "checkbox") return el.checked;
+  if (el.dataset.kind === "id") return el.value ? Number(el.value) : null;
+  if (el.dataset.kind === "bool") return el.value === "true";
+  if (el.dataset.kind === "number") return el.value === "" ? "" : Number(el.value);
+  return el.value;
+}
+export const idList = (text) => String(text ?? "").split(",").map(Number).filter(Boolean);
+
 export function pageHeader(title, controlsHtml = "") {
   return `<div class="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-3">
     <h1 class="text-2xl font-bold text-gray-900">${esc(title)}</h1><div class="flex flex-wrap gap-2">${controlsHtml}</div></div>`;
@@ -164,6 +179,15 @@ export function toast(message, kind = "ok") {
   el.textContent = message;
   toastBox.append(el);
   setTimeout(() => el.remove(), kind === "error" ? 8000 : 3500);
+}
+
+/** Hanya field yang berubah yang dikirim ke Odoo: menulis ulang nilai yang sama dapat memicu hitung ulang (lihat D10). */
+export function changedValues(current, initial, keys) {
+  const changed = {};
+  for (const key of keys) {
+    if (JSON.stringify(current[key] ?? null) !== JSON.stringify(initial?.[key] ?? null)) changed[key] = current[key];
+  }
+  return changed;
 }
 
 /** Menjalankan tugas dengan tombol dinonaktifkan; galat ditampilkan, hasil undefined bila gagal. */
@@ -206,6 +230,28 @@ export async function referenceUsers() {
   ctx.users ??= await searchRead("res.users", [["share", "=", false]], ["display_name"], { order: "name", limit: 100 });
   return ctx.users;
 }
+
+/** Data referensi yang jarang berubah dimuat sekali per sesi. */
+const refCache = {};
+const reference = (key, loader) =>
+  (refCache[key] ??= loader().catch((error) => {
+    delete refCache[key]; // jangan simpan kegagalan: muat ulang pada pemanggilan berikutnya
+    throw error;
+  }));
+export const resetReferences = () => {
+  for (const key of Object.keys(refCache)) delete refCache[key];
+};
+export const referenceTerms = () => reference("terms", () => searchRead("account.payment.term", [], ["display_name"], { limit: 50 }));
+export const referenceCurrencies = () => reference("currencies", () => searchRead("res.currency", [["active", "=", true]], ["display_name"], { order: "name" }));
+export const referenceCountries = () => reference("countries", () => searchRead("res.country", [], ["display_name", "code"], { order: "name" }));
+export const referenceCategories = () => reference("categories", () => searchRead("product.category", [], ["display_name"], { order: "complete_name" }));
+export const referenceUoms = () => reference("uoms", () => searchRead("uom.uom", [], ["display_name"], { order: "name", limit: 100 }));
+export const referenceTaxes = (type) => reference(`taxes-${type}`, () => searchRead("account.tax", [["type_tax_use", "=", type]], ["display_name"], { order: "sequence, id" }));
+export const referenceSelection = (model, field) =>
+  reference(`sel-${model}-${field}`, async () => {
+    const info = await call(model, "fields_get", { allfields: [field], attributes: ["selection"] });
+    return info[field]?.selection ?? [];
+  });
 
 export function renderSession() {
   if (!ctx.user) {

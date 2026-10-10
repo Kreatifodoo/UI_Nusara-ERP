@@ -55,6 +55,8 @@ async function renderList(query) {
   else if (filter === "paid") domain.push(["payment_state", "in", ["paid", "in_payment"]]);
   else if (filter) domain.push(["state", "=", filter]);
   if (ids.length) domain.push(["id", "in", ids]);
+  const partner = Number(query.get("partner")) || null;
+  if (partner) domain.push(["partner_id", "=", partner]);
   const rows = await searchRead(
     "account.move",
     domain,
@@ -83,6 +85,9 @@ async function renderList(query) {
       `${filterSelect(options, filter)}
        <button data-action="refresh" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50" aria-label="Muat ulang"><i class="fas fa-rotate"></i></button>`,
     ) +
+    (partner
+      ? `<p class="text-sm text-gray-500 mb-3">Difilter per pemasok. <a href="#/bill" class="text-indigo-600 hover:underline">Tampilkan semua</a></p>`
+      : "") +
     table(
       [{ label: "Nomor" }, { label: "Pemasok" }, { label: "Tanggal Tagihan" }, { label: "Jatuh Tempo" }, { label: "Dokumen Sumber" }, { label: "Total", right: true }, { label: "Sisa", right: true }, { label: "Status" }, { label: "Pembayaran" }],
       body,

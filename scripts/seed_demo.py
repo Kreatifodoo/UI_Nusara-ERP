@@ -18,7 +18,7 @@ tax = env["account.tax"].search(
 )
 vendor = env["res.partner"].search([("name", "=", "PT Pemasok Nusantara")], limit=1) or env[
     "res.partner"
-].create({"name": "PT Pemasok Nusantara", "is_company": True})
+].create({"name": "PT Pemasok Nusantara", "is_company": True, "supplier_rank": 1})
 product = env["product.product"].search([("name", "=", "Bahan Baku Nusara")], limit=1) or env[
     "product.product"
 ].create(

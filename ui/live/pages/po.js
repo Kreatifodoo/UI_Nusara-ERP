@@ -110,6 +110,8 @@ async function renderList(query) {
   if (filter === "rfq") domain.push(["state", "in", ["draft", "sent", "to approve"]]);
   else if (filter) domain.push(["state", "=", filter]);
   if (ids.length) domain.push(["id", "in", ids]);
+  const partner = Number(query.get("partner")) || null;
+  if (partner) domain.push(["partner_id", "=", partner]);
   const rows = await searchRead(
     "purchase.order",
     domain,
@@ -139,6 +141,9 @@ async function renderList(query) {
        <button data-action="refresh" class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50" aria-label="Muat ulang"><i class="fas fa-rotate"></i></button>
        <a href="#/po/new" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"><i class="fas fa-plus mr-2"></i>RFQ Baru</a>`,
     ) +
+    (partner
+      ? `<p class="text-sm text-gray-500 mb-3">Difilter per pemasok. <a href="#/po" class="text-indigo-600 hover:underline">Tampilkan semua</a></p>`
+      : "") +
     table(
       [{ label: "Nomor" }, { label: "Pemasok" }, { label: "Pembeli" }, { label: "Tanggal" }, { label: "Dokumen Sumber" }, { label: "Total", right: true }, { label: "Status" }, { label: "Tagihan" }, { label: "Penerimaan" }],
       body,
